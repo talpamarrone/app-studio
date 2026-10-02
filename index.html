@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#d9480f">
+  <title>Programma · App studio</title>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <header class="barra">
+    <h1>Programma</h1>
+  </header>
+
+  <main>
+    <!-- Nessun esame ancora -->
+    <section id="benvenuto" class="card benvenuto" hidden>
+      <h2>Inizia dal tuo esame</h2>
+      <p>Imposta la data dell'esame e i giorni di riposo: il ritmo di studio si calcola da solo.</p>
+      <button type="button" class="primario" data-apri="esame">Crea esame</button>
+    </section>
+
+    <section id="esame" class="card esame" hidden></section>
+
+    <section id="riepilogo" class="card riepilogo" hidden aria-label="Riepilogo"></section>
+
+    <section id="sezione-argomenti" class="sezione" hidden>
+      <div class="intestazione">
+        <h2>Argomenti</h2>
+        <button type="button" class="secondario piccolo" data-apri="elenco">Incolla elenco</button>
+      </div>
+      <ol id="lista-argomenti" class="lista-argomenti"></ol>
+      <form id="form-argomento-rapido" class="aggiunta" autocomplete="off">
+        <input name="titolo" placeholder="Nuovo argomento" aria-label="Titolo del nuovo argomento" required>
+        <input name="peso" type="number" inputmode="numeric" min="1" max="99" value="2"
+               aria-label="Peso in pomodori" title="Peso in pomodori">
+        <button type="submit" class="primario" aria-label="Aggiungi argomento">+</button>
+      </form>
+    </section>
+
+    <section id="sezione-compiti" class="sezione">
+      <div class="intestazione">
+        <h2>Compiti</h2>
+        <button type="button" id="pulisci-compiti" class="testo piccolo" hidden>Elimina completati</button>
+      </div>
+      <p class="nota">Promemoria generici: non contano nei progressi.</p>
+      <ul id="lista-compiti" class="lista-compiti"></ul>
+      <form id="form-compito" class="aggiunta" autocomplete="off">
+        <input name="testo" placeholder="Nuovo compito" aria-label="Nuovo compito" required>
+        <button type="submit" class="primario" aria-label="Aggiungi compito">+</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- Esame -->
+  <dialog id="dlg-esame">
+    <form id="form-esame" novalidate>
+      <h2 id="titolo-dlg-esame">Esame</h2>
+      <label class="campo">Nome
+        <input name="nome" required placeholder="Es. Analisi 1">
+      </label>
+      <div class="due-colonne">
+        <label class="campo">Inizio studio
+          <input name="dataInizio" type="date" required>
+        </label>
+        <label class="campo">Data esame
+          <input name="dataEsame" type="date" required>
+        </label>
+      </div>
+      <fieldset class="campo">
+        <legend>Giorni di riposo</legend>
+        <div id="scelta-riposo" class="chip-gruppo"></div>
+      </fieldset>
+      <label class="campo">Giorni di ripasso prima dell'esame
+        <input name="giorniRipasso" type="number" inputmode="numeric" min="0" max="60" value="0">
+        <small>Gli ultimi giorni di calendario, esclusi dal ritmo di studio.</small>
+      </label>
+      <p id="anteprima-esame" class="nota" aria-live="polite"></p>
+      <p id="errore-esame" class="errore" aria-live="assertive"></p>
+      <div class="azioni">
+        <button type="button" id="elimina-esame" class="pericolo testo">Elimina esame</button>
+        <span class="spazio"></span>
+        <button type="button" class="secondario" data-chiudi>Annulla</button>
+        <button type="submit" class="primario">Salva</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Argomento -->
+  <dialog id="dlg-argomento">
+    <form id="form-argomento" novalidate>
+      <h2>Argomento</h2>
+      <label class="campo">Titolo
+        <input name="titolo" required>
+      </label>
+      <div class="campo">
+        <span id="etichetta-peso">Peso (pomodori stimati)</span>
+        <div class="stepper" role="group" aria-labelledby="etichetta-peso">
+          <button type="button" class="secondario" data-passo="-1" aria-label="Diminuisci">−</button>
+          <input name="peso" type="number" inputmode="numeric" min="1" max="99" required aria-labelledby="etichetta-peso">
+          <button type="button" class="secondario" data-passo="1" aria-label="Aumenta">+</button>
+        </div>
+      </div>
+      <fieldset class="campo">
+        <legend>Stato</legend>
+        <div class="segmenti">
+          <label><input type="radio" name="stato" value="da_fare"><span>Da fare</span></label>
+          <label><input type="radio" name="stato" value="in_corso"><span>In corso</span></label>
+          <label><input type="radio" name="stato" value="fatto"><span>Fatto</span></label>
+        </div>
+      </fieldset>
+      <p id="errore-argomento" class="errore" aria-live="assertive"></p>
+      <div class="azioni">
+        <button type="button" id="elimina-argomento" class="pericolo testo">Elimina</button>
+        <span class="spazio"></span>
+        <button type="button" class="secondario" data-chiudi>Annulla</button>
+        <button type="submit" class="primario">Salva</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Inserimento rapido -->
+  <dialog id="dlg-elenco">
+    <form id="form-elenco" novalidate>
+      <h2>Incolla elenco</h2>
+      <label class="campo">Un argomento per riga
+        <textarea name="testo" rows="8" placeholder="Limiti&#10;Derivate&#10;Integrali"></textarea>
+        <small>Puntini e numerazione all'inizio delle righe vengono tolti.</small>
+      </label>
+      <label class="campo">Peso di ciascuno (poi lo correggi)
+        <input name="peso" type="number" inputmode="numeric" min="1" max="99" value="2">
+      </label>
+      <p id="anteprima-elenco" class="nota" aria-live="polite"></p>
+      <div class="azioni">
+        <span class="spazio"></span>
+        <button type="button" class="secondario" data-chiudi>Annulla</button>
+        <button type="submit" class="primario">Crea</button>
+      </div>
+    </form>
+  </dialog>
+</body>
+</html>

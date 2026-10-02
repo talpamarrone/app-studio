@@ -1,0 +1,409 @@
+/* Mobile-first: la base è per il telefono, i media query allargano per il PC. */
+
+:root {
+  --sfondo: #f6f4f1;
+  --superficie: #ffffff;
+  --testo: #1f1d1a;
+  --testo-tenue: #6b655d;
+  --bordo: #e4dfd8;
+  --bordo-forte: #b9b1a6;
+  --accento: #d9480f;
+  --accento-testo: #ffffff;
+  --accento-tenue: #fde8dc;
+  --ok: #2b8a3e;
+  --pericolo: #c92a2a;
+  --raggio: 14px;
+  --ombra: 0 1px 2px rgb(0 0 0 / 0.05), 0 2px 8px rgb(0 0 0 / 0.04);
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --sfondo: #151413;
+    --superficie: #1f1e1c;
+    --testo: #f1eee9;
+    --testo-tenue: #a39d94;
+    --bordo: #33302c;
+    --bordo-forte: #5c564f;
+    --accento: #ff7a45;
+    --accento-testo: #1a0d06;
+    --accento-tenue: #3a2116;
+    --ok: #51cf66;
+    --pericolo: #ff6b6b;
+    --ombra: none;
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--sfondo);
+  color: var(--testo);
+  font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+h1, h2 { margin: 0; line-height: 1.2; }
+h1 { font-size: 1.35rem; }
+h2 { font-size: 1.1rem; }
+p { margin: 0; }
+
+[hidden] { display: none !important; }
+
+/* ---------------------------------------------------------------- struttura */
+
+.barra {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: calc(12px + env(safe-area-inset-top)) 16px 12px;
+  background: color-mix(in srgb, var(--sfondo) 88%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+main {
+  display: grid;
+  gap: 16px;
+  padding: 4px 16px 32px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.barra h1 { max-width: 608px; margin: 0 auto; }
+
+.card {
+  background: var(--superficie);
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  box-shadow: var(--ombra);
+  padding: 16px;
+}
+
+.sezione { display: grid; gap: 10px; }
+
+.intestazione {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.nota { color: var(--testo-tenue); font-size: 0.9rem; }
+.errore { color: var(--pericolo); font-size: 0.9rem; min-height: 1.2em; }
+.errore:empty { display: none; }
+
+/* ---------------------------------------------------------------- bottoni e campi */
+
+button {
+  font: inherit;
+  color: inherit;
+  min-height: 44px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: none;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+button:disabled { opacity: 0.3; cursor: default; }
+button:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--accento);
+  outline-offset: 2px;
+}
+
+.primario { background: var(--accento); color: var(--accento-testo); font-weight: 600; }
+.secondario { background: var(--superficie); border-color: var(--bordo-forte); }
+.testo { padding: 0 8px; color: var(--accento); }
+.pericolo { color: var(--pericolo); }
+.piccolo { min-height: 36px; padding: 0 12px; font-size: 0.9rem; }
+
+input, textarea {
+  font: inherit;
+  font-size: 16px; /* sotto i 16px iOS fa zoom sul campo */
+  color: inherit;
+  background: var(--superficie);
+  border: 1px solid var(--bordo-forte);
+  border-radius: 10px;
+  min-height: 44px;
+  padding: 8px 12px;
+  width: 100%;
+}
+
+textarea { resize: vertical; line-height: 1.5; }
+
+input[type="number"] { text-align: center; }
+
+.campo {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+.campo legend { padding: 0; margin-bottom: 6px; }
+.campo small { color: var(--testo-tenue); font-weight: 400; }
+
+.due-colonne { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+/* ---------------------------------------------------------------- esame e riepilogo */
+
+.benvenuto { display: grid; gap: 12px; text-align: center; padding: 28px 20px; }
+.benvenuto p { color: var(--testo-tenue); }
+.benvenuto button { justify-self: center; }
+
+.esame { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.esame-testo { display: grid; gap: 4px; min-width: 0; }
+.esame-testo h2 { font-size: 1.25rem; overflow-wrap: anywhere; }
+.esame-data::first-letter { text-transform: uppercase; }
+
+.riepilogo { display: grid; gap: 12px; }
+
+.statistiche {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  text-align: center;
+}
+
+.statistiche div { display: grid; gap: 2px; }
+.statistiche strong { font-size: 1.6rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.statistiche span { color: var(--testo-tenue); font-size: 0.8rem; line-height: 1.2; }
+
+.barra-progresso {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--accento-tenue);
+  overflow: hidden;
+}
+
+.barra-progresso div {
+  height: 100%;
+  background: var(--accento);
+  border-radius: inherit;
+  transition: width 0.3s;
+}
+
+/* ---------------------------------------------------------------- argomenti */
+
+.lista-argomenti, .lista-compiti {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--superficie);
+  border: 1px solid var(--bordo);
+  border-radius: var(--raggio);
+  box-shadow: var(--ombra);
+  overflow: hidden;
+}
+
+.lista-argomenti > li + li, .lista-compiti > li + li { border-top: 1px solid var(--bordo); }
+
+.vuoto { padding: 20px 16px; color: var(--testo-tenue); text-align: center; }
+
+.argomento {
+  display: grid;
+  grid-template-columns: 48px 1fr auto auto;
+  align-items: center;
+  min-height: 60px;
+  padding-right: 4px;
+}
+
+.stato { padding: 0; display: grid; place-items: center; min-height: 56px; }
+
+.stato::before {
+  content: "";
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--bordo-forte);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--superficie);
+}
+
+.argomento[data-stato="in_corso"] .stato::before {
+  border-color: var(--accento);
+  background: linear-gradient(90deg, var(--accento) 50%, transparent 50%);
+}
+
+.argomento[data-stato="fatto"] .stato::before {
+  content: "✓";
+  border-color: var(--ok);
+  background: var(--ok);
+}
+
+.titolo {
+  display: grid;
+  justify-items: start;
+  text-align: left;
+  padding: 8px 8px 8px 0;
+  min-width: 0;
+  border-radius: 0;
+}
+
+.titolo span { overflow-wrap: anywhere; }
+.titolo small { color: var(--testo-tenue); font-size: 0.78rem; }
+
+.argomento[data-stato="fatto"] .titolo span {
+  color: var(--testo-tenue);
+  text-decoration: line-through;
+  text-decoration-color: var(--bordo-forte);
+}
+
+.argomento[data-stato="in_corso"] .titolo small { color: var(--accento); font-weight: 600; }
+
+.peso {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  padding: 0 6px;
+  color: var(--testo-tenue);
+}
+
+.sposta { display: grid; }
+.sposta button {
+  min-height: 28px;
+  width: 40px;
+  padding: 0;
+  font-size: 0.7rem;
+  color: var(--testo-tenue);
+}
+
+.segnaposto {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: var(--accento-tenue);
+  color: var(--accento);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.segnaposto::before { content: "📍"; letter-spacing: 0; }
+
+/* ---------------------------------------------------------------- aggiunta rapida */
+
+.aggiunta { display: flex; gap: 8px; }
+.aggiunta input[name="titolo"], .aggiunta input[name="testo"] { flex: 1; min-width: 0; }
+.aggiunta input[name="peso"] { width: 64px; flex: none; }
+.aggiunta button { flex: none; width: 48px; padding: 0; font-size: 1.4rem; }
+
+/* ---------------------------------------------------------------- compiti */
+
+.compito { display: flex; align-items: center; }
+
+.compito label {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0 10px 16px;
+  min-height: 52px;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.compito input { width: 20px; height: 20px; min-height: 0; flex: none; accent-color: var(--ok); }
+.compito span { overflow-wrap: anywhere; }
+.compito.fatto span { color: var(--testo-tenue); text-decoration: line-through; }
+.compito .elimina { width: 48px; padding: 0; font-size: 1.4rem; color: var(--testo-tenue); }
+
+/* ---------------------------------------------------------------- dialog */
+
+dialog {
+  width: 100%;
+  max-width: 100%;
+  max-height: 92dvh;
+  margin: auto 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: 20px 20px 0 0;
+  background: var(--superficie);
+  color: var(--testo);
+}
+
+dialog::backdrop { background: rgb(0 0 0 / 0.45); }
+
+dialog form {
+  display: grid;
+  gap: 14px;
+  padding: 20px 16px calc(16px + env(safe-area-inset-bottom));
+}
+
+.azioni { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+.spazio { flex: 1; }
+
+.chip-gruppo { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.chip input, .segmenti input { position: absolute; opacity: 0; pointer-events: none; }
+
+.chip span {
+  display: grid;
+  place-items: center;
+  min-width: 44px;
+  min-height: 40px;
+  padding: 0 8px;
+  border: 1px solid var(--bordo-forte);
+  border-radius: 99px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.chip input:checked + span { background: var(--accento); border-color: var(--accento); color: var(--accento-testo); font-weight: 600; }
+.chip input:focus-visible + span, .segmenti input:focus-visible + span { outline: 2px solid var(--accento); outline-offset: 2px; }
+
+.segmenti {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border: 1px solid var(--bordo-forte);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.segmenti label + label { border-left: 1px solid var(--bordo-forte); }
+
+.segmenti span {
+  display: grid;
+  place-items: center;
+  min-height: 44px;
+  font-weight: 400;
+  cursor: pointer;
+}
+
+.segmenti input:checked + span { background: var(--accento); color: var(--accento-testo); font-weight: 600; }
+
+.stepper { display: grid; grid-template-columns: 48px 1fr 48px; gap: 8px; }
+.stepper button { padding: 0; font-size: 1.3rem; }
+
+/* ---------------------------------------------------------------- schermi larghi */
+
+@media (min-width: 640px) {
+  main { padding-top: 12px; }
+
+  dialog {
+    max-width: 480px;
+    margin: auto;
+    border-radius: 20px;
+  }
+
+  dialog form { padding: 24px; }
+}
+
+@media (hover: hover) {
+  .titolo:hover span { text-decoration: underline; text-decoration-color: var(--bordo-forte); }
+  .sposta button:not(:disabled):hover, .compito .elimina:hover { color: var(--testo); }
+}

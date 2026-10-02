@@ -13,6 +13,9 @@ import {
   pesoTotale,
   pesoCompletato,
   pesoRimanente,
+  percentualeCompletata,
+  conStato,
+  titoliDaElenco,
   pesoCompletatoInizioGiornata,
   obiettivoOggi,
   pesoPrevisto,
@@ -451,5 +454,63 @@ describe('streak', () => {
   test('tutti i giorni di riposo: termina comunque', () => {
     const s = sessioni('A', '2026-09-01');
     assert.equal(streak(s, [0, 1, 2, 3, 4, 5, 6], '2026-10-07'), 1);
+  });
+});
+
+describe('percentualeCompletata', () => {
+  test('per difetto, 100 solo a programma finito', () => {
+    // 22 totale: B fatto = 6 → 27,27% → 27
+    assert.equal(percentualeCompletata(con(programma(), { B: { stato: 'fatto' } }), []), 27);
+    const quasi = con(programma(), { A: { stato: 'fatto' }, B: { stato: 'fatto' }, C: { stato: 'fatto' }, D: { stato: 'in_corso' } });
+    assert.equal(percentualeCompletata(quasi, sessioni('D', '2026-10-06', 6)), 95);
+    const tutto = programma().map((a) => ({ ...a, stato: 'fatto' }));
+    assert.equal(percentualeCompletata(tutto, []), 100);
+  });
+
+  test('programma vuoto: zero', () => {
+    assert.equal(percentualeCompletata([], []), 0);
+  });
+});
+
+describe('conStato', () => {
+  test('diventa fatto: dataCompletamento a oggi', () => {
+    const a = conStato(argomento('A', 4, 1, 'in_corso'), 'fatto', '2026-10-07');
+    assert.equal(a.stato, 'fatto');
+    assert.equal(a.dataCompletamento, '2026-10-07');
+  });
+
+  test('già fatto: mantiene la data originale', () => {
+    const a = conStato(argomento('A', 4, 1, 'fatto', '2026-10-05'), 'fatto', '2026-10-07');
+    assert.equal(a.dataCompletamento, '2026-10-05');
+  });
+
+  test('torna da fare o in corso: data azzerata', () => {
+    assert.equal(conStato(argomento('A', 4, 1, 'fatto', '2026-10-05'), 'in_corso', '2026-10-07').dataCompletamento, null);
+    assert.equal(conStato(argomento('A', 4, 1, 'fatto', '2026-10-05'), 'da_fare', '2026-10-07').dataCompletamento, null);
+  });
+
+  test('non modifica l\'originale', () => {
+    const originale = argomento('A', 4, 1);
+    conStato(originale, 'fatto', '2026-10-07');
+    assert.equal(originale.stato, 'da_fare');
+  });
+});
+
+describe('titoliDaElenco', () => {
+  test('una riga per titolo, senza righe vuote né spazi', () => {
+    assert.deepEqual(titoliDaElenco('  Limiti \n\nDerivate\r\nIntegrali\n   \n'), ['Limiti', 'Derivate', 'Integrali']);
+  });
+
+  test('toglie puntini e numerazione iniziali', () => {
+    const testo = '- Limiti\n* Derivate\n• Integrali\n1. Serie\n2) Equazioni differenziali\n– Topologia';
+    assert.deepEqual(titoliDaElenco(testo), ['Limiti', 'Derivate', 'Integrali', 'Serie', 'Equazioni differenziali', 'Topologia']);
+  });
+
+  test('non tocca numeri che fanno parte del titolo', () => {
+    assert.deepEqual(titoliDaElenco('1.2 Successioni\n3D e superfici\n-1 come esponente'), ['1.2 Successioni', '3D e superfici', '-1 come esponente']);
+  });
+
+  test('testo vuoto', () => {
+    assert.deepEqual(titoliDaElenco(''), []);
   });
 });

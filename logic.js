@@ -113,6 +113,13 @@ export function pesoRimanente(argomenti, sessioni) {
   return pesoTotale(argomenti) - pesoCompletato(argomenti, sessioni);
 }
 
+/** Percentuale intera di peso completato, per difetto: 100 solo a programma finito. */
+export function percentualeCompletata(argomenti, sessioni) {
+  const totale = pesoTotale(argomenti);
+  if (totale === 0) return 0;
+  return Math.floor((pesoCompletato(argomenti, sessioni) / totale) * 100);
+}
+
 /**
  * Peso completato com'era all'inizio di `oggi`: si ignorano le sessioni di oggi
  * e gli argomenti completati oggi contano come ancora in corso.
@@ -124,6 +131,30 @@ export function pesoCompletatoInizioGiornata(argomenti, sessioni, oggi) {
     const comEra = fattoDaOggi ? { ...a, stato: 'in_corso' } : a;
     return somma + pesoFatto(comEra, pomodori.get(a.id) ?? 0);
   }, 0);
+}
+
+// ---------------------------------------------------------------- modifica degli argomenti
+
+/**
+ * Argomento con il nuovo stato. dataCompletamento si imposta a oggi quando
+ * diventa fatto, resta com'è se era già fatto, si azzera negli altri stati.
+ */
+export function conStato(argomento, stato, oggi) {
+  let dataCompletamento = null;
+  if (stato === 'fatto') {
+    dataCompletamento = argomento.stato === 'fatto' ? (argomento.dataCompletamento ?? oggi) : oggi;
+  }
+  return { ...argomento, stato, dataCompletamento };
+}
+
+const MARCATORE_ELENCO = /^(?:[-*•·–—]\s+|\d+[.)]\s+)/;
+
+/** Titoli da un elenco incollato: uno per riga, senza righe vuote né puntini o numeri iniziali. */
+export function titoliDaElenco(testo) {
+  return testo
+    .split(/\r?\n/)
+    .map((riga) => riga.trim().replace(MARCATORE_ELENCO, '').trim())
+    .filter((riga) => riga !== '');
 }
 
 // ---------------------------------------------------------------- obiettivo di oggi

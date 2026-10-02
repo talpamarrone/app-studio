@@ -13,6 +13,7 @@ Ritmo, percentuali, streak e punti si **calcolano sempre** dai dati, non si salv
 - Dati in `localStorage`, dietro un unico modulo `storage.js` (così in futuro si può sostituire con una sincronizzazione).
 - Tutta la logica di calcolo in `logic.js`: funzioni pure, senza accesso a DOM o storage, che ricevono la data di "oggi" come parametro.
 - Test della logica con il test runner integrato di Node (`node --test`).
+- Avvio in sviluppo: `npm start` (`server.js`, server statico senza dipendenze, porta 8080, raggiungibile anche dalla rete locale).
 - Deve funzionare bene su telefono (layout mobile-first) e su PC.
 - Interfaccia in italiano.
 
