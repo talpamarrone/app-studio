@@ -111,7 +111,7 @@ button {
 }
 
 button:disabled { opacity: 0.3; cursor: default; }
-button:focus-visible, input:focus-visible, textarea:focus-visible {
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
   outline: 2px solid var(--accento);
   outline-offset: 2px;
 }
@@ -122,7 +122,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 .pericolo { color: var(--pericolo); }
 .piccolo { min-height: 36px; padding: 0 12px; font-size: 0.9rem; }
 
-input, textarea {
+input, textarea, select {
   font: inherit;
   font-size: 16px; /* sotto i 16px iOS fa zoom sul campo */
   color: inherit;
@@ -191,6 +191,48 @@ input[type="number"] { text-align: center; }
   border-radius: inherit;
   transition: width 0.3s;
 }
+
+/* ---------------------------------------------------------------- timer */
+
+.timer { display: grid; gap: 12px; }
+
+.timer-testa { display: flex; align-items: center; gap: 8px; min-height: 36px; }
+.timer-testa .testo { margin-right: -8px; }
+
+.etichetta {
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--accento-tenue);
+  color: var(--accento);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.timer-tempo {
+  font-size: 4rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-align: center;
+  letter-spacing: -0.02em;
+  padding: 8px 0 4px;
+}
+
+.timer[data-fase="fermo"] .timer-tempo { color: var(--testo-tenue); }
+.timer[data-in-pausa="true"] .timer-tempo { opacity: 0.5; }
+
+.timer-sottotitolo { text-align: center; color: var(--testo-tenue); overflow-wrap: anywhere; }
+.timer[data-fase="pomodoro"] .timer-sottotitolo { color: var(--testo); font-weight: 600; }
+
+/* Le pause in verde, per distinguerle a colpo d'occhio dal pomodoro. */
+.timer[data-fase^="pausa"] .timer-testa h2 { color: var(--ok); }
+.timer[data-fase^="pausa"] .barra-progresso { background: color-mix(in srgb, var(--ok) 18%, transparent); }
+.timer[data-fase^="pausa"] .barra-progresso div { background: var(--ok); }
+.timer .barra-progresso div { transition: width 0.25s linear; }
+
+.timer-azioni { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 
 /* ---------------------------------------------------------------- argomenti */
 

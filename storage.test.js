@@ -116,6 +116,39 @@ describe('impostazioni', () => {
   });
 });
 
+describe('sessioni', () => {
+  test('aggiungiSessione assegna un id', () => {
+    const s = storage.aggiungiSessione({ argomentoId: 'a1', data: '2026-10-05', durataMinuti: 25 });
+    assert.ok(s.id);
+    assert.deepEqual(storage.getSessioni(), [s]);
+  });
+});
+
+describe('timer', () => {
+  test('vuoto di default, si salva e sopravvive a un ricaricamento', () => {
+    assert.deepEqual(storage.getTimer(), { attivo: null, daConfermare: null });
+    const stato = { attivo: { fase: 'pomodoro', argomentoId: 'a1', inizio: 1000 }, daConfermare: null };
+    storage.salvaTimer(stato);
+    storage.usaBackend(backend); // come aprire la pagina di nuovo
+    assert.deepEqual(storage.getTimer(), stato);
+  });
+
+  test('dati salvati prima del timer: stato vuoto', () => {
+    backend = backendFinto({ 'app-studio:v1': JSON.stringify({ versione: 1, esami: [] }) });
+    storage.usaBackend(backend);
+    assert.deepEqual(storage.getTimer(), { attivo: null, daConfermare: null });
+  });
+
+  test("ricarica legge le modifiche fatte da un'altra scheda", () => {
+    storage.getTimer();
+    const altra = { versione: 1, timer: { attivo: null, daConfermare: 'a1' } };
+    backend.setItem('app-studio:v1', JSON.stringify(altra));
+    assert.equal(storage.getTimer().daConfermare, null);
+    storage.ricarica();
+    assert.equal(storage.getTimer().daConfermare, 'a1');
+  });
+});
+
 describe('robustezza', () => {
   test('dati corrotti: si mettono da parte e si riparte vuoti', () => {
     backend = backendFinto({ 'app-studio:v1': '{non è json' });

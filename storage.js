@@ -1,7 +1,8 @@
 // Unico punto di accesso ai dati salvati. Il resto dell'app non tocca mai
 // localStorage: per passare a una sincronizzazione basta cambiare questo modulo.
 //
-// Si salvano solo esami, argomenti, sessioni, compiti e impostazioni.
+// Si salvano solo esami, argomenti, sessioni, compiti e impostazioni, più lo
+// stato del timer in corso (serve a sopravvivere a un ricaricamento).
 // Tutto ciò che si può calcolare (ritmo, percentuali, streak) non sta qui.
 
 const CHIAVE = 'app-studio:v1';
@@ -13,6 +14,8 @@ export const IMPOSTAZIONI_DEFAULT = Object.freeze({
   pomodoriPrimaPausaLunga: 4,
 });
 
+const TIMER_VUOTO = Object.freeze({ attivo: null, daConfermare: null });
+
 function datiVuoti() {
   return {
     versione: 1,
@@ -21,6 +24,7 @@ function datiVuoti() {
     sessioni: [],
     compiti: [],
     impostazioni: { ...IMPOSTAZIONI_DEFAULT },
+    timer: { ...TIMER_VUOTO },
   };
 }
 
@@ -30,6 +34,11 @@ let dati = null;
 /** Sostituisce il backend (un oggetto con getItem/setItem); usato nei test. */
 export function usaBackend(nuovo) {
   backend = nuovo;
+  dati = null;
+}
+
+/** Dimentica la copia in memoria: la prossima lettura riparte dal backend (es. dopo modifiche da un'altra scheda). */
+export function ricarica() {
   dati = null;
 }
 
@@ -155,6 +164,14 @@ export function getSessioni() {
   return copia(leggi().sessioni);
 }
 
+/** Registra un pomodoro portato a termine: { argomentoId, data, durataMinuti }. */
+export function aggiungiSessione(sessione) {
+  const salvata = { id: nuovoId(), ...copia(sessione) };
+  leggi().sessioni.push(salvata);
+  scrivi();
+  return copia(salvata);
+}
+
 // ---------------------------------------------------------------- compiti
 
 export function getCompiti() {
@@ -187,5 +204,17 @@ export function getImpostazioni() {
 
 export function salvaImpostazioni(impostazioni) {
   leggi().impostazioni = { ...getImpostazioni(), ...impostazioni };
+  scrivi();
+}
+
+// ---------------------------------------------------------------- timer
+
+/** Stato del timer: { attivo, daConfermare } (vedi logic.js). */
+export function getTimer() {
+  return { ...TIMER_VUOTO, ...copia(leggi().timer ?? {}) };
+}
+
+export function salvaTimer(stato) {
+  leggi().timer = copia(stato);
   scrivi();
 }

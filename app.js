@@ -1,17 +1,29 @@
-// Schermata Programma: legge dallo storage, calcola con logic.js, disegna.
+// Schermata Programma con il timer: legge dallo storage, calcola con logic.js, disegna.
 // Ogni modifica salva e ridisegna tutto: i dati sono pochi.
 
 import * as storage from './storage.js';
 import {
+  MS_MINUTO,
+  argomentoProposto,
+  avanzaTimer,
+  avviaFase,
   conStato,
+  dataLocale,
   differenzaGiorni,
   dovreiEssereQui,
   faseEsame,
+  formattaTempo,
   giorniStudioRimasti,
   giorniStudioTotali,
+  isScaduto,
+  mettiInPausa,
   percentualeCompletata,
   pesoRimanente,
+  pomodoriDelGiorno,
   pomodoriPerArgomento,
+  riprendi,
+  tempoRimanente,
+  tempoTrascorso,
   titoliDaElenco,
 } from './logic.js';
 
@@ -35,9 +47,7 @@ const $ = (selettore) => document.querySelector(selettore);
 
 /** Data locale di oggi come 'YYYY-MM-DD'. */
 function oggi() {
-  const d = new Date();
-  const due = (n) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${due(d.getMonth() + 1)}-${due(d.getDate())}`;
+  return dataLocale(Date.now());
 }
 
 function formattaData(data, opzioni = { weekday: 'short', day: 'numeric', month: 'short' }) {
@@ -66,8 +76,13 @@ function esameCorrente() {
 // ---------------------------------------------------------------- disegno
 
 function render() {
+  // Prima si registrano i pomodori scaduti (anche a pagina chiusa), poi si disegna.
+  aggiornaStatoTimer();
+
   const esame = esameCorrente();
   const giorno = oggi();
+  const argomenti = esame ? storage.getArgomenti(esame.id) : [];
+  const sessioni = storage.getSessioni();
 
   $('#benvenuto').hidden = Boolean(esame);
   $('#esame').hidden = !esame;
@@ -75,12 +90,12 @@ function render() {
   $('#sezione-argomenti').hidden = !esame;
 
   if (esame) {
-    const argomenti = storage.getArgomenti(esame.id);
-    const sessioni = storage.getSessioni();
     renderEsame(esame, giorno);
     renderRiepilogo(esame, argomenti, sessioni, giorno);
     renderArgomenti(esame, argomenti, sessioni, giorno);
   }
+  renderTimer(esame, argomenti, sessioni, giorno);
+  renderEsito(argomenti);
   renderCompiti();
 }
 
@@ -146,7 +161,6 @@ function renderArgomenti(esame, argomenti, sessioni, giorno) {
 
   const righe = argomenti.map((a, i) => {
     const fatti = pomodori.get(a.id) ?? 0;
-    const peso = a.stato === 'in_corso' ? `${Math.min(fatti, a.peso)}/${a.peso}` : a.peso;
     const riga = `
       <li class="argomento" data-id="${esc(a.id)}" data-stato="${a.stato}">
         <button type="button" class="stato" data-azione="stato"
@@ -155,7 +169,7 @@ function renderArgomenti(esame, argomenti, sessioni, giorno) {
           <span>${esc(a.titolo)}</span>
           <small>${NOMI_STATO[a.stato]}</small>
         </button>
-        <span class="peso" title="Pomodori stimati">${peso}<span aria-hidden="true">🍅</span></span>
+        <span class="peso" title="Pomodori fatti / stimati">${fatti}/${a.peso}<span aria-hidden="true">🍅</span></span>
         <span class="sposta">
           <button type="button" data-azione="su" aria-label="Sposta su" ${i === 0 ? 'disabled' : ''}>▲</button>
           <button type="button" data-azione="giu" aria-label="Sposta giù" ${i === argomenti.length - 1 ? 'disabled' : ''}>▼</button>
@@ -451,11 +465,346 @@ $('#pulisci-compiti').addEventListener('click', () => {
   renderCompiti();
 });
 
+// ---------------------------------------------------------------- timer
+
+// Con ?veloce nell'indirizzo ogni minuto del timer dura un secondo: serve a provarlo.
+const VELOCE = new URLSearchParams(location.search).has('veloce');
+const MS_MINUTO_APP = VELOCE ? 1000 : MS_MINUTO;
+
+const NOMI_FASE = { pomodoro: 'Pomodoro', pausa_breve: 'Pausa breve', pausa_lunga: 'Pausa lunga' };
+const TITOLO_PAGINA = document.title;
+
+// Argomento scelto nel menu del timer; se diventa fatto si torna al primo non fatto.
+let argomentoScelto = null;
+let ticker = null;
+
+/** Registra i pomodori scaduti e fa partire le pause. Non disegna. */
+function aggiornaStatoTimer() {
+  if (!isScadutoOra(storage.getTimer())) return;
+  // Un'altra scheda aperta potrebbe averlo già registrato: si rilegge prima di scrivere.
+  storage.ricarica();
+  const { stato, eventi } = avanzaTimer(storage.getTimer(), Date.now(), {
+    impostazioni: storage.getImpostazioni(),
+    sessioni: storage.getSessioni(),
+    msMinuto: MS_MINUTO_APP,
+  });
+  if (!eventi.length) return;
+  for (const e of eventi) {
+    if (e.tipo === 'pomodoro_finito') storage.aggiungiSessione(e.sessione);
+  }
+  storage.salvaTimer(stato);
+  avvisa(eventi.at(-1), stato);
+}
+
+function isScadutoOra({ attivo }) {
+  return Boolean(attivo) && isScaduto(attivo, Date.now());
+}
+
+function renderTimer(esame, argomenti, sessioni, giorno) {
+  const sezione = $('#timer');
+  const { attivo } = storage.getTimer();
+  sezione.hidden = !esame && !attivo;
+  pianificaTick(attivo);
+  if (sezione.hidden) return;
+
+  sezione.dataset.fase = attivo?.fase ?? 'fermo';
+  sezione.dataset.inPausa = String(Boolean(attivo && attivo.inPausaDa !== null));
+  const testa = (titolo) => `
+    <div class="timer-testa">
+      <h2>${titolo}</h2>
+      ${VELOCE ? '<span class="etichetta" title="Ogni minuto dura un secondo">veloce</span>' : ''}
+      <span class="spazio"></span>
+      <button type="button" class="testo piccolo" data-timer="impostazioni">Impostazioni</button>
+    </div>`;
+  const fattiOggi = pomodoriDelGiorno(sessioni, giorno);
+  const notaOggi = `<p class="nota">Oggi: ${plurale(fattiOggi, 'pomodoro', 'pomodori')}</p>`;
+
+  if (!attivo) {
+    if (argomenti.length === 0) {
+      sezione.innerHTML = `${testa('Pomodoro')}<p class="nota">Aggiungi un argomento per usare il timer.</p>`;
+    } else {
+      // Nel menu solo gli argomenti da finire; a programma completato tutti, per ripassare.
+      const scegliibili = argomenti.some((a) => a.stato !== 'fatto') ? argomenti.filter((a) => a.stato !== 'fatto') : argomenti;
+      const selezionato = argomentoProposto(argomenti, argomentoScelto)?.id
+        ?? (scegliibili.some((a) => a.id === argomentoScelto) ? argomentoScelto : scegliibili[0].id);
+      const durata = storage.getImpostazioni().durataPomodoro;
+      sezione.innerHTML = `
+        ${testa('Pomodoro')}
+        <p class="timer-tempo">${formattaTempo(durata * MS_MINUTO)}</p>
+        <label class="campo">Argomento
+          <select id="timer-argomento">
+            ${scegliibili.map((a) => `<option value="${esc(a.id)}" ${a.id === selezionato ? 'selected' : ''}>${esc(a.titolo)}</option>`).join('')}
+          </select>
+        </label>
+        <button type="button" class="primario" data-timer="avvia">▶ Avvia pomodoro</button>
+        ${notaOggi}`;
+    }
+  } else {
+    const inPausa = attivo.inPausaDa !== null;
+    const argomento = argomenti.find((a) => a.id === attivo.argomentoId);
+    const sottotitolo = attivo.fase === 'pomodoro'
+      ? esc(argomento?.titolo ?? 'Argomento eliminato')
+      : 'Stacca dallo schermo: il prossimo pomodoro lo avvii tu.';
+    sezione.innerHTML = `
+      ${testa(NOMI_FASE[attivo.fase])}
+      <p class="timer-sottotitolo">${sottotitolo}</p>
+      <p class="timer-tempo" id="timer-tempo" role="timer"></p>
+      <div class="barra-progresso" aria-hidden="true"><div id="timer-barra"></div></div>
+      <div class="timer-azioni">
+        <button type="button" class="${inPausa ? 'primario' : 'secondario'}" data-timer="${inPausa ? 'riprendi' : 'pausa'}">
+          ${inPausa ? '▶ Riprendi' : '⏸ Pausa'}</button>
+        <button type="button" class="secondario" data-timer="annulla">
+          ${attivo.fase === 'pomodoro' ? 'Annulla' : 'Salta pausa'}</button>
+      </div>
+      ${inPausa ? '<p class="nota">In pausa.</p>' : notaOggi}`;
+  }
+  aggiornaDisplay();
+}
+
+/** Aggiorna solo i numeri che cambiano ogni secondo. */
+function aggiornaDisplay() {
+  const { attivo } = storage.getTimer();
+  if (!attivo) {
+    document.title = TITOLO_PAGINA;
+    return;
+  }
+  const ora = Date.now();
+  const tempo = formattaTempo(tempoRimanente(attivo, ora));
+  const display = $('#timer-tempo');
+  if (display) display.textContent = tempo;
+  const barra = $('#timer-barra');
+  if (barra) barra.style.width = `${(tempoTrascorso(attivo, ora) / attivo.durataMs) * 100}%`;
+  document.title = `${attivo.inPausaDa !== null ? '⏸ ' : ''}${tempo} · ${NOMI_FASE[attivo.fase]}`;
+}
+
+// Il tick serve solo a ridisegnare: il tempo si ricalcola ogni volta dagli orari salvati.
+function tick() {
+  if (isScadutoOra(storage.getTimer())) render();
+  else aggiornaDisplay();
+}
+
+function pianificaTick(attivo) {
+  const corre = Boolean(attivo) && attivo.inPausaDa === null;
+  if (corre && !ticker) ticker = setInterval(tick, 250);
+  if (!corre && ticker) {
+    clearInterval(ticker);
+    ticker = null;
+  }
+}
+
+function modificaTimer(cambia) {
+  const stato = storage.getTimer();
+  storage.salvaTimer({ ...stato, attivo: cambia(stato.attivo) });
+  render();
+}
+
+$('#timer').addEventListener('change', (e) => {
+  if (e.target.id === 'timer-argomento') argomentoScelto = e.target.value;
+});
+
+$('#timer').addEventListener('click', (e) => {
+  const azione = e.target.closest('[data-timer]')?.dataset.timer;
+  if (!azione) return;
+  const ora = Date.now();
+
+  if (azione === 'impostazioni') return apriImpostazioni();
+  if (azione === 'avvia') {
+    const id = $('#timer-argomento')?.value;
+    if (!id) return;
+    argomentoScelto = id;
+    sbloccaAudio();
+    chiediPermessoNotifiche();
+    modificaTimer(() => avviaFase('pomodoro', storage.getImpostazioni(), ora, { argomentoId: id, msMinuto: MS_MINUTO_APP }));
+  }
+  if (azione === 'pausa') modificaTimer((t) => t && mettiInPausa(t, ora));
+  if (azione === 'riprendi') {
+    sbloccaAudio();
+    modificaTimer((t) => t && riprendi(t, ora));
+  }
+  if (azione === 'annulla') {
+    const { attivo } = storage.getTimer();
+    if (attivo?.fase === 'pomodoro' && !confirm('Annullare il pomodoro? Non verrà registrato.')) return;
+    modificaTimer(() => null);
+  }
+
+  // Dopo il ridisegno il fuoco resta sul bottone equivalente.
+  const dopo = { pausa: 'riprendi', riprendi: 'pausa', avvia: 'pausa', annulla: 'avvia' }[azione];
+  $(`#timer [data-timer="${dopo}"]`)?.focus();
+});
+
+// ---------------------------------------------------------------- fine pomodoro: argomento finito?
+
+const dlgEsito = $('#dlg-esito');
+
+function renderEsito(argomenti) {
+  const { daConfermare } = storage.getTimer();
+  if (!daConfermare) {
+    if (dlgEsito.open) dlgEsito.close();
+    return;
+  }
+  if (dlgEsito.open) return;
+  const argomento = argomenti.find((a) => a.id === daConfermare);
+  if (!argomento) {
+    // Argomento eliminato nel frattempo: non c'è niente da chiedere.
+    storage.salvaTimer({ ...storage.getTimer(), daConfermare: null });
+    return;
+  }
+  $('#testo-esito').innerHTML = `Hai finito <strong>${esc(argomento.titolo)}</strong> o resta in corso?`;
+  dlgEsito.returnValue = '';
+  dlgEsito.showModal();
+}
+
+// Chiuso senza rispondere (sfondo, Esc) vale "resta in corso": il pomodoro conta comunque.
+dlgEsito.addEventListener('close', () => {
+  const stato = storage.getTimer();
+  if (!stato.daConfermare) return;
+  const esame = esameCorrente();
+  const argomento = esame && storage.getArgomenti(esame.id).find((a) => a.id === stato.daConfermare);
+  if (argomento) {
+    const nuovo = dlgEsito.returnValue === 'fatto' ? 'fatto' : 'in_corso';
+    storage.salvaArgomento(conStato(argomento, nuovo, oggi()));
+  }
+  storage.salvaTimer({ ...stato, daConfermare: null });
+  render();
+});
+
+// ---------------------------------------------------------------- impostazioni del timer
+
+const formImpostazioni = $('#form-impostazioni');
+
+const LIMITI_IMPOSTAZIONI = {
+  durataPomodoro: { min: 1, max: 120, nome: 'La durata del pomodoro' },
+  pomodoriPrimaPausaLunga: { min: 1, max: 12, nome: 'Il numero di pomodori prima della pausa lunga' },
+  pausaBreve: { min: 1, max: 60, nome: 'La pausa breve' },
+  pausaLunga: { min: 1, max: 60, nome: 'La pausa lunga' },
+};
+
+function riempiImpostazioni(valori) {
+  for (const campo of Object.keys(LIMITI_IMPOSTAZIONI)) formImpostazioni.elements[campo].value = valori[campo];
+}
+
+function apriImpostazioni() {
+  riempiImpostazioni(storage.getImpostazioni());
+  $('#errore-impostazioni').textContent = '';
+  $('#stato-notifiche').textContent = testoNotifiche();
+  apriDialog($('#dlg-impostazioni'));
+}
+
+$('#ripristina-impostazioni').addEventListener('click', () => riempiImpostazioni(storage.IMPOSTAZIONI_DEFAULT));
+
+formImpostazioni.addEventListener('submit', (ev) => {
+  ev.preventDefault();
+  const valori = {};
+  for (const [campo, { min, max, nome }] of Object.entries(LIMITI_IMPOSTAZIONI)) {
+    const n = Number(formImpostazioni.elements[campo].value);
+    if (!Number.isInteger(n) || n < min || n > max) {
+      $('#errore-impostazioni').textContent = `${nome} è un numero intero da ${min} a ${max}.`;
+      formImpostazioni.elements[campo].focus();
+      return;
+    }
+    valori[campo] = n;
+  }
+  storage.salvaImpostazioni(valori);
+  $('#dlg-impostazioni').close();
+  render();
+});
+
+// ---------------------------------------------------------------- suono e notifiche
+
+// Il suono si genera con Web Audio: niente file. Il browser lo consente solo
+// dopo un gesto dell'utente, quindi il contesto si crea al primo tocco.
+let audio = null;
+
+function sbloccaAudio() {
+  try {
+    audio ??= new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === 'suspended') audio.resume();
+  } catch {
+    audio = null;
+  }
+}
+
+document.addEventListener('pointerdown', sbloccaAudio, { passive: true });
+
+function suona(note) {
+  try {
+    if (!audio) return;
+    if (audio.state === 'suspended') audio.resume();
+    note.forEach((frequenza, i) => {
+      const t = audio.currentTime + i * 0.22;
+      const oscillatore = audio.createOscillator();
+      const volume = audio.createGain();
+      oscillatore.frequency.value = frequenza;
+      volume.gain.setValueAtTime(0.0001, t);
+      volume.gain.exponentialRampToValueAtTime(0.3, t + 0.02);
+      volume.gain.exponentialRampToValueAtTime(0.0001, t + 0.2);
+      oscillatore.connect(volume).connect(audio.destination);
+      oscillatore.start(t);
+      oscillatore.stop(t + 0.22);
+    });
+  } catch {
+    // Senza audio resta la notifica.
+  }
+  try {
+    navigator.vibrate?.([200, 100, 200]);
+  } catch {
+    // Vibrazione non disponibile.
+  }
+}
+
+function notificheDisponibili() {
+  return 'Notification' in window;
+}
+
+function chiediPermessoNotifiche() {
+  try {
+    if (notificheDisponibili() && Notification.permission === 'default') {
+      Notification.requestPermission()?.catch?.(() => {});
+    }
+  } catch {
+    // Browser vecchi o pagina non sicura: niente notifiche.
+  }
+}
+
+function notifica(titolo, testo) {
+  try {
+    // Con la pagina davanti agli occhi bastano suono e finestra.
+    if (!notificheDisponibili() || Notification.permission !== 'granted' || document.hasFocus()) return;
+    new Notification(titolo, { body: testo, tag: 'app-studio-timer' });
+  } catch {
+    // Alcuni browser (Chrome su Android) non permettono notifiche senza service worker.
+  }
+}
+
+function testoNotifiche() {
+  if (!notificheDisponibili()) return 'Notifiche non disponibili in questa pagina: a fine pomodoro avvisa il suono.';
+  if (Notification.permission === 'granted') return 'Notifiche attive.';
+  if (Notification.permission === 'denied') return 'Notifiche bloccate dal browser: a fine pomodoro avvisa il suono.';
+  return 'Le notifiche vengono chieste al primo avvio del timer.';
+}
+
+function avvisa(evento, stato) {
+  if (evento.tipo === 'pomodoro_finito') {
+    suona([660, 880, 1100]);
+    notifica('Pomodoro completato 🍅', `Ora ${NOMI_FASE[stato.attivo?.fase ?? 'pausa_breve'].toLowerCase()}.`);
+  } else {
+    suona([880, 660]);
+    notifica('Pausa finita', 'Quando vuoi, avvia il prossimo pomodoro.');
+  }
+}
+
 // ---------------------------------------------------------------- avvio
 
-// Se l'app resta aperta oltre la mezzanotte, al ritorno i calcoli usano il nuovo giorno.
+// Se l'app resta aperta oltre la mezzanotte, al ritorno i calcoli usano il nuovo giorno;
+// se il timer è scaduto a schermo spento, si registra ora.
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') render();
+});
+
+// Modifiche da un'altra scheda aperta sull'app.
+window.addEventListener('storage', () => {
+  storage.ricarica();
+  render();
 });
 
 render();

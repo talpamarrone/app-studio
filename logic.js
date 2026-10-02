@@ -273,3 +273,131 @@ export function streak(sessioni, giorniRiposo, oggi) {
   }
   return n;
 }
+
+// ---------------------------------------------------------------- timer pomodoro
+//
+// Un timer è un dato: { fase, argomentoId, durataMinuti, durataMs, inizio, pausaMs, inPausaDa }.
+// Gli orari sono millisecondi da epoch. Il tempo trascorso si ricava sempre
+// dall'orario di inizio, mai contando i tick: resta giusto con la scheda in
+// background, lo schermo spento o dopo un ricaricamento.
+//
+// Lo stato salvato è { attivo: timer | null, daConfermare: argomentoId | null }:
+// daConfermare è l'argomento del pomodoro appena finito, di cui chiedere se è finito.
+
+export const MS_MINUTO = 60 * 1000;
+
+export const STATO_TIMER_VUOTO = Object.freeze({ attivo: null, daConfermare: null });
+
+const DURATA_FASE = { pomodoro: 'durataPomodoro', pausa_breve: 'pausaBreve', pausa_lunga: 'pausaLunga' };
+
+/** Data locale 'YYYY-MM-DD' di un orario. */
+export function dataLocale(ms) {
+  const d = new Date(ms);
+  const due = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${due(d.getMonth() + 1)}-${due(d.getDate())}`;
+}
+
+/**
+ * Nuovo timer che parte a `ora`. fase: 'pomodoro' | 'pausa_breve' | 'pausa_lunga'.
+ * msMinuto permette di accorciare i minuti per provare l'app.
+ */
+export function avviaFase(fase, impostazioni, ora, { argomentoId = null, msMinuto = MS_MINUTO } = {}) {
+  const durataMinuti = impostazioni[DURATA_FASE[fase]];
+  return {
+    fase,
+    argomentoId: fase === 'pomodoro' ? argomentoId : null,
+    durataMinuti,
+    durataMs: durataMinuti * msMinuto,
+    inizio: ora,
+    pausaMs: 0,
+    inPausaDa: null,
+  };
+}
+
+export function tempoTrascorso(timer, ora) {
+  const fino = timer.inPausaDa ?? ora;
+  return Math.min(timer.durataMs, Math.max(0, fino - timer.inizio - timer.pausaMs));
+}
+
+export function tempoRimanente(timer, ora) {
+  return timer.durataMs - tempoTrascorso(timer, ora);
+}
+
+/** Orario in cui il timer finisce; null se è in pausa. */
+export function momentoFine(timer) {
+  if (timer.inPausaDa !== null) return null;
+  return timer.inizio + timer.pausaMs + timer.durataMs;
+}
+
+export function isScaduto(timer, ora) {
+  const fine = momentoFine(timer);
+  return fine !== null && ora >= fine;
+}
+
+/** Ferma il conto. Non si può mettere in pausa oltre la fine. */
+export function mettiInPausa(timer, ora) {
+  if (timer.inPausaDa !== null) return timer;
+  return { ...timer, inPausaDa: Math.min(ora, momentoFine(timer)) };
+}
+
+/** Riparte da dove era: il tempo passato in pausa si aggiunge a pausaMs. */
+export function riprendi(timer, ora) {
+  if (timer.inPausaDa === null) return timer;
+  return { ...timer, pausaMs: timer.pausaMs + Math.max(0, ora - timer.inPausaDa), inPausaDa: null };
+}
+
+/** Pausa che segue l'n-esimo pomodoro della giornata: lunga ogni N pomodori. */
+export function tipoPausa(pomodoriOggi, impostazioni) {
+  const n = impostazioni.pomodoriPrimaPausaLunga;
+  return n > 0 && pomodoriOggi > 0 && pomodoriOggi % n === 0 ? 'pausa_lunga' : 'pausa_breve';
+}
+
+/**
+ * Porta lo stato del timer a `ora`. Restituisce { stato, eventi }.
+ * Un pomodoro scaduto produce { tipo: 'pomodoro_finito', fine, sessione } e fa
+ * partire la pausa dall'orario esatto di fine; una pausa scaduta produce
+ * { tipo: 'pausa_finita', fine, fase } e lascia il timer fermo.
+ * `sessione` è { argomentoId, data, durataMinuti }, da registrare.
+ * Se lo schermo è rimasto spento a lungo, i due eventi arrivano insieme.
+ */
+export function avanzaTimer(stato, ora, { impostazioni, sessioni, msMinuto = MS_MINUTO }) {
+  const eventi = [];
+  let attuale = stato;
+
+  while (attuale.attivo && isScaduto(attuale.attivo, ora)) {
+    const timer = attuale.attivo;
+    const fine = momentoFine(timer);
+
+    if (timer.fase === 'pomodoro') {
+      const data = dataLocale(fine);
+      eventi.push({
+        tipo: 'pomodoro_finito',
+        fine,
+        sessione: { argomentoId: timer.argomentoId, data, durataMinuti: timer.durataMinuti },
+      });
+      const pausa = tipoPausa(pomodoriDelGiorno(sessioni, data) + 1, impostazioni);
+      attuale = { attivo: avviaFase(pausa, impostazioni, fine, { msMinuto }), daConfermare: timer.argomentoId };
+    } else {
+      eventi.push({ tipo: 'pausa_finita', fine, fase: timer.fase });
+      attuale = { ...attuale, attivo: null };
+    }
+  }
+
+  return { stato: attuale, eventi };
+}
+
+/** 'mm:ss', arrotondato per eccesso al secondo: 0:00 solo alla fine. */
+export function formattaTempo(ms) {
+  const secondi = Math.max(0, Math.ceil(ms / 1000));
+  return `${String(Math.floor(secondi / 60)).padStart(2, '0')}:${String(secondi % 60).padStart(2, '0')}`;
+}
+
+/**
+ * Argomento da proporre per il prossimo pomodoro: quello scelto, se esiste e
+ * non è fatto; altrimenti il primo non fatto; altrimenti null.
+ */
+export function argomentoProposto(argomenti, sceltoId = null) {
+  const scelto = argomenti.find((a) => a.id === sceltoId);
+  if (scelto && scelto.stato !== 'fatto') return scelto;
+  return ordinaArgomenti(argomenti).find((a) => a.stato !== 'fatto') ?? null;
+}

@@ -49,6 +49,11 @@ Il modello supporta più esami fin da subito, anche se l'interfaccia iniziale ne
 - Con zero giorni di studio rimasti l'obiettivo è `null` con stato esplicito: `esame_oggi` o `esame_passato`. Nello stato `in_ripasso` con argomenti ancora da fare, invece, l'obiettivo è peso rimanente ÷ giorni che mancano all'esame.
 - In un giorno di riposo l'obiettivo è 0 con stato `riposo`; prima di `dataInizio` è 0 con stato `non_iniziato`.
 - Se prima dell'esame restano solo giorni di riposo (nessun giorno di studio rimasto, fuori dal ripasso), si applica la regola del ripasso: peso rimanente ÷ giorni di calendario che mancano all'esame.
+- Timer: lo stato del timer in corso (`{ attivo, daConfermare }`) si salva nello storage, perché deve sopravvivere a un ricaricamento. Il timer salva orari, non tick: `inizio`, `pausaMs`, `inPausaDa`.
+- Timer: la pausa parte dall'orario esatto di fine del pomodoro; a fine pausa il timer si ferma e il pomodoro successivo si avvia a mano.
+- Timer: la pausa lunga scatta dopo ogni N-esimo pomodoro della giornata (N = pomodori prima della pausa lunga).
+- Timer: la sessione ha la data del momento in cui il pomodoro è finito. Chiudere la domanda "finito?" senza rispondere vale "resta in corso".
+- Timer: `?veloce` nell'indirizzo fa durare ogni minuto un secondo, per le prove.
 
 ## Schermate
 

@@ -25,6 +25,8 @@
 
     <section id="riepilogo" class="card riepilogo" hidden aria-label="Riepilogo"></section>
 
+    <section id="timer" class="card timer" hidden aria-label="Timer pomodoro"></section>
+
     <section id="sezione-argomenti" class="sezione" hidden>
       <div class="intestazione">
         <h2>Argomenti</h2>
@@ -113,6 +115,49 @@
       <p id="errore-argomento" class="errore" aria-live="assertive"></p>
       <div class="azioni">
         <button type="button" id="elimina-argomento" class="pericolo testo">Elimina</button>
+        <span class="spazio"></span>
+        <button type="button" class="secondario" data-chiudi>Annulla</button>
+        <button type="submit" class="primario">Salva</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Fine pomodoro: l'argomento è finito? -->
+  <dialog id="dlg-esito">
+    <form method="dialog">
+      <h2>Pomodoro completato 🍅</h2>
+      <p id="testo-esito"></p>
+      <div class="azioni">
+        <span class="spazio"></span>
+        <button type="submit" value="in_corso" class="secondario">Resta in corso</button>
+        <button type="submit" value="fatto" class="primario">Sì, è finito</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Impostazioni del timer -->
+  <dialog id="dlg-impostazioni">
+    <form id="form-impostazioni" novalidate>
+      <h2>Impostazioni timer</h2>
+      <div class="due-colonne">
+        <label class="campo">Pomodoro (min)
+          <input name="durataPomodoro" type="number" inputmode="numeric" min="1" max="120" required>
+        </label>
+        <label class="campo">Pomodori prima della pausa lunga
+          <input name="pomodoriPrimaPausaLunga" type="number" inputmode="numeric" min="1" max="12" required>
+        </label>
+        <label class="campo">Pausa breve (min)
+          <input name="pausaBreve" type="number" inputmode="numeric" min="1" max="60" required>
+        </label>
+        <label class="campo">Pausa lunga (min)
+          <input name="pausaLunga" type="number" inputmode="numeric" min="1" max="60" required>
+        </label>
+      </div>
+      <p class="nota">Valgono dal prossimo pomodoro o dalla prossima pausa.</p>
+      <p id="stato-notifiche" class="nota"></p>
+      <p id="errore-impostazioni" class="errore" aria-live="assertive"></p>
+      <div class="azioni">
+        <button type="button" id="ripristina-impostazioni" class="testo">Valori predefiniti</button>
         <span class="spazio"></span>
         <button type="button" class="secondario" data-chiudi>Annulla</button>
         <button type="submit" class="primario">Salva</button>
