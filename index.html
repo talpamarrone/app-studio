@@ -198,6 +198,16 @@
         <button type="button" class="secondario" data-chiudi>Annulla</button>
         <button type="submit" class="primario">Salva</button>
       </div>
+
+      <!-- Agisce subito, senza Salva: per togliere i pomodori di prova. -->
+      <fieldset class="cancella-giorno">
+        <legend>Cancella i pomodori di un giorno</legend>
+        <div class="aggiunta">
+          <input id="data-cancella" type="date" aria-label="Giorno di cui cancellare i pomodori">
+          <button type="button" id="cancella-sessioni" class="secondario pericolo">Cancella</button>
+        </div>
+        <p id="anteprima-cancella" class="nota" aria-live="polite"></p>
+      </fieldset>
     </form>
   </dialog>
 

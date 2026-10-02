@@ -179,6 +179,16 @@ export function aggiungiSessione(sessione) {
   return copia(salvata);
 }
 
+/** Elimina tutte le sessioni di una data ('YYYY-MM-DD'). Restituisce quante ne ha tolte. */
+export function eliminaSessioniDelGiorno(data) {
+  const d = leggi();
+  const prima = d.sessioni.length;
+  d.sessioni = d.sessioni.filter((s) => s.data !== data);
+  const tolte = prima - d.sessioni.length;
+  if (tolte) scrivi();
+  return tolte;
+}
+
 // ---------------------------------------------------------------- compiti
 
 export function getCompiti() {

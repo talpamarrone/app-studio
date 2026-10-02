@@ -1107,8 +1107,38 @@ function apriImpostazioni() {
   riempiImpostazioni(storage.getImpostazioni());
   $('#errore-impostazioni').textContent = '';
   $('#stato-notifiche').textContent = testoNotifiche();
+  $('#data-cancella').value = oggi();
+  aggiornaAnteprimaCancella();
   apriDialog($('#dlg-impostazioni'));
 }
+
+// ---------------------------------------------------------------- cancella i pomodori di un giorno
+
+function aggiornaAnteprimaCancella(fatto = '') {
+  const data = $('#data-cancella').value;
+  const n = data ? pomodoriDelGiorno(storage.getSessioni(), data) : 0;
+  $('#cancella-sessioni').disabled = n === 0;
+  const stato = !data
+    ? 'Scegli un giorno.'
+    : n
+      ? `${plurale(n, 'pomodoro registrato', 'pomodori registrati')} in questo giorno. Lo stato degli argomenti non cambia.`
+      : 'Nessun pomodoro registrato in questo giorno.';
+  $('#anteprima-cancella').textContent = fatto ? `${fatto} ${stato}` : stato;
+}
+
+$('#data-cancella').addEventListener('input', () => aggiornaAnteprimaCancella());
+
+$('#cancella-sessioni').addEventListener('click', () => {
+  const data = $('#data-cancella').value;
+  const n = data ? pomodoriDelGiorno(storage.getSessioni(), data) : 0;
+  if (!n) return;
+  const giorno = formattaData(data, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  const quanti = n === 1 ? 'l\'unico pomodoro' : `i ${n} pomodori`;
+  if (!confirm(`Cancellare ${quanti} di ${giorno}? Non si può annullare.`)) return;
+  const tolte = storage.eliminaSessioniDelGiorno(data);
+  render();
+  aggiornaAnteprimaCancella(`${tolte === 1 ? 'Cancellato 1 pomodoro' : `Cancellati ${tolte} pomodori`}.`);
+});
 
 $('#ripristina-impostazioni').addEventListener('click', () => riempiImpostazioni(storage.IMPOSTAZIONI_DEFAULT));
 

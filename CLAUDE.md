@@ -61,6 +61,7 @@ Il modello supporta più esami fin da subito, anche se l'interfaccia iniziale ne
 - Grafico 14 giorni: l'obiettivo di ogni giorno passato si ricostruisce con `obiettivoOggi` su quel giorno (sessioni precedenti e `dataCompletamento`), non si salva.
 - Obiettivo raggiunto: il messaggio compare nella domanda "finito?" (e nella notifica) solo per il pomodoro che porta i pomodori del giorno esattamente all'obiettivo; non si salva.
 - Totale pomodori fatti = tutte le sessioni, anche di argomenti eliminati.
+- Impostazioni: si possono cancellare tutte le sessioni di un giorno (con conferma), per togliere i pomodori di prova. Agisce subito, senza Salva, e non cambia lo stato degli argomenti.
 - Oggi: la frase sotto l'obiettivo usa il peso rimanente a inizio giornata (quello dell'obiettivo); se oggi hai già studiato lo dice ("a inizio giornata restavano…").
 
 ## Schermate

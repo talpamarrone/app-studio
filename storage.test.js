@@ -129,6 +129,16 @@ describe('sessioni', () => {
     storage.aggiungiSessione(sessione);
     assert.equal(storage.getSessioni().length, 1);
   });
+
+  test('eliminaSessioniDelGiorno toglie solo quelle di quella data', () => {
+    storage.aggiungiSessione({ argomentoId: 'a1', data: '2026-10-05', durataMinuti: 25 });
+    storage.aggiungiSessione({ argomentoId: 'a2', data: '2026-10-05', durataMinuti: 25 });
+    const resta = storage.aggiungiSessione({ argomentoId: 'a1', data: '2026-10-06', durataMinuti: 25 });
+    assert.equal(storage.eliminaSessioniDelGiorno('2026-10-05'), 2);
+    storage.ricarica();
+    assert.deepEqual(storage.getSessioni(), [resta]);
+    assert.equal(storage.eliminaSessioniDelGiorno('2026-10-07'), 0);
+  });
 });
 
 describe('timer', () => {

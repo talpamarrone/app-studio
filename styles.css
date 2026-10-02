@@ -736,6 +736,20 @@ dialog form {
 .azioni { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
 .spazio { flex: 1; }
 
+.cancella-giorno {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 0;
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid var(--bordo);
+  min-width: 0;
+}
+
+.cancella-giorno legend { float: left; padding: 0; font-size: 0.9rem; font-weight: 600; }
+.cancella-giorno input { flex: 1; min-width: 0; }
+.cancella-giorno button { flex: none; width: auto; padding: 0 16px; font-size: inherit; }
+
 .chip-gruppo { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .chip input, .segmenti input { position: absolute; opacity: 0; pointer-events: none; }
