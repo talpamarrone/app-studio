@@ -28,7 +28,7 @@ Il modello supporta più esami fin da subito, anche se l'interfaccia iniziale ne
 
 ## Regole di calcolo (logic.js)
 
-- **Peso rimanente** = somma dei pesi degli argomenti non `fatto`.
+- **Peso rimanente** = peso totale − peso completato (vedi Decisioni: anche i pomodori sugli argomenti `in_corso` lo riducono).
 - **Giorni di studio rimasti** = giorni da oggi alla data d'esame, esclusi i giorni di riposo e i `giorniRipasso` finali. Oggi conta se è un giorno di studio.
 - **Obiettivo di oggi** = peso rimanente ÷ giorni di studio rimasti, arrotondato per eccesso. Si ricalcola ogni giorno: se resto indietro, sale da solo.
 - **Dove dovrei essere** = l'argomento a cui sarei arrivato oggi seguendo un ritmo costante dall'inizio.
@@ -46,6 +46,8 @@ Il modello supporta più esami fin da subito, anche se l'interfaccia iniziale ne
 - Tolleranza per "in linea": un giorno di ritmo costante (pesoTotale ÷ giorni di studio totali, minimo 1).
 - Streak: se oggi non ho ancora studiato vale quella di ieri fino a fine giornata; studiare in un giorno di riposo fa +1.
 - Con zero giorni di studio rimasti l'obiettivo è `null` con stato esplicito: `esame_oggi` o `esame_passato`. Nello stato `in_ripasso` con argomenti ancora da fare, invece, l'obiettivo è peso rimanente ÷ giorni che mancano all'esame.
+- In un giorno di riposo l'obiettivo è 0 con stato `riposo`; prima di `dataInizio` è 0 con stato `non_iniziato`.
+- Se prima dell'esame restano solo giorni di riposo (nessun giorno di studio rimasto, fuori dal ripasso), si applica la regola del ripasso: peso rimanente ÷ giorni di calendario che mancano all'esame.
 
 ## Schermate
 
