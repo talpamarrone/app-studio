@@ -54,6 +54,9 @@ Il modello supporta più esami fin da subito, anche se l'interfaccia iniziale ne
 - Timer: la pausa lunga scatta dopo ogni N-esimo pomodoro della giornata (N = pomodori prima della pausa lunga).
 - Timer: la sessione ha la data del momento in cui il pomodoro è finito. Chiudere la domanda "finito?" senza rispondere vale "resta in corso".
 - Timer: `?veloce` nell'indirizzo fa durare ogni minuto un secondo, per le prove.
+- Timer: la sessione ha id `pomodoro-<inizio>` e lo storage ignora un id già registrato, così due schede aperte non contano due volte lo stesso pomodoro.
+- Navigazione: una sola pagina, la schermata sta nell'indirizzo (`#oggi`, `#programma`), barra in basso. Oggi è la schermata di partenza.
+- Oggi: la frase sotto l'obiettivo usa il peso rimanente a inizio giornata (quello dell'obiettivo); se oggi hai già studiato lo dice ("a inizio giornata restavano…").
 
 ## Schermate
 

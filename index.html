@@ -4,15 +4,16 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#d9480f">
-  <title>Programma · App studio</title>
+  <title>Oggi · App studio</title>
   <link rel="stylesheet" href="styles.css">
   <script type="module" src="app.js"></script>
 </head>
-<body>
+<body data-vista="oggi">
   <header class="barra">
-    <h1>Programma</h1>
+    <h1 id="titolo-vista">Oggi</h1>
   </header>
 
+  <!-- Le sezioni con data-vista compaiono solo nella loro schermata; le altre in tutte. -->
   <main>
     <!-- Nessun esame ancora -->
     <section id="benvenuto" class="card benvenuto" hidden>
@@ -21,13 +22,25 @@
       <button type="button" class="primario" data-apri="esame">Crea esame</button>
     </section>
 
-    <section id="esame" class="card esame" hidden></section>
+    <!-- Oggi -->
+    <section id="oggi" class="card oggi" hidden data-vista="oggi" aria-label="Obiettivo di oggi"></section>
 
-    <section id="riepilogo" class="card riepilogo" hidden aria-label="Riepilogo"></section>
+    <section id="timer" class="card timer" hidden data-vista="oggi" aria-label="Timer pomodoro"></section>
 
-    <section id="timer" class="card timer" hidden aria-label="Timer pomodoro"></section>
+    <section id="sezione-prossimi" class="sezione" hidden data-vista="oggi">
+      <div class="intestazione">
+        <h2>Prossimi argomenti</h2>
+        <a href="#programma" class="testo piccolo">Tutto il programma</a>
+      </div>
+      <ol id="lista-prossimi" class="lista-argomenti"></ol>
+    </section>
 
-    <section id="sezione-argomenti" class="sezione" hidden>
+    <!-- Programma -->
+    <section id="esame" class="card esame" hidden data-vista="programma"></section>
+
+    <section id="riepilogo" class="card riepilogo" hidden data-vista="programma" aria-label="Riepilogo"></section>
+
+    <section id="sezione-argomenti" class="sezione" hidden data-vista="programma">
       <div class="intestazione">
         <h2>Argomenti</h2>
         <button type="button" class="secondario piccolo" data-apri="elenco">Incolla elenco</button>
@@ -41,7 +54,7 @@
       </form>
     </section>
 
-    <section id="sezione-compiti" class="sezione">
+    <section id="sezione-compiti" class="sezione" data-vista="programma">
       <div class="intestazione">
         <h2>Compiti</h2>
         <button type="button" id="pulisci-compiti" class="testo piccolo" hidden>Elimina completati</button>
@@ -54,6 +67,17 @@
       </form>
     </section>
   </main>
+
+  <nav class="navigazione" aria-label="Schermate">
+    <a href="#oggi" data-vai="oggi">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg>
+      <span>Oggi</span>
+    </a>
+    <a href="#programma" data-vai="programma">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2"/><circle cx="4.5" cy="12" r="1.2"/><circle cx="4.5" cy="18" r="1.2"/></svg>
+      <span>Programma</span>
+    </a>
+  </nav>
 
   <!-- Esame -->
   <dialog id="dlg-esame">

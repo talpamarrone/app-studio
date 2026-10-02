@@ -232,6 +232,11 @@ export function dovreiEssereQui(esame, argomenti, oggi) {
   return null;
 }
 
+/** I primi `n` argomenti ancora da finire, nell'ordine del programma. */
+export function prossimiArgomenti(argomenti, n = 3) {
+  return ordinaArgomenti(argomenti).filter((a) => a.stato !== 'fatto').slice(0, n);
+}
+
 const EPSILON = 1e-9;
 
 /**
@@ -357,7 +362,9 @@ export function tipoPausa(pomodoriOggi, impostazioni) {
  * Un pomodoro scaduto produce { tipo: 'pomodoro_finito', fine, sessione } e fa
  * partire la pausa dall'orario esatto di fine; una pausa scaduta produce
  * { tipo: 'pausa_finita', fine, fase } e lascia il timer fermo.
- * `sessione` è { argomentoId, data, durataMinuti }, da registrare.
+ * `sessione` è { id, argomentoId, data, durataMinuti }, da registrare. L'id
+ * viene dall'orario di inizio: due schede che chiudono lo stesso pomodoro
+ * producono la stessa sessione, e lo storage la registra una volta sola.
  * Se lo schermo è rimasto spento a lungo, i due eventi arrivano insieme.
  */
 export function avanzaTimer(stato, ora, { impostazioni, sessioni, msMinuto = MS_MINUTO }) {
@@ -373,7 +380,7 @@ export function avanzaTimer(stato, ora, { impostazioni, sessioni, msMinuto = MS_
       eventi.push({
         tipo: 'pomodoro_finito',
         fine,
-        sessione: { argomentoId: timer.argomentoId, data, durataMinuti: timer.durataMinuti },
+        sessione: { id: `pomodoro-${timer.inizio}`, argomentoId: timer.argomentoId, data, durataMinuti: timer.durataMinuti },
       });
       const pausa = tipoPausa(pomodoriDelGiorno(sessioni, data) + 1, impostazioni);
       attuale = { attivo: avviaFase(pausa, impostazioni, fine, { msMinuto }), daConfermare: timer.argomentoId };

@@ -164,10 +164,17 @@ export function getSessioni() {
   return copia(leggi().sessioni);
 }
 
-/** Registra un pomodoro portato a termine: { argomentoId, data, durataMinuti }. */
+/**
+ * Registra un pomodoro portato a termine: { id?, argomentoId, data, durataMinuti }.
+ * Se l'id è già registrato non fa nulla: il timer lo usa per non contare due volte
+ * un pomodoro chiuso da due schede aperte insieme.
+ */
 export function aggiungiSessione(sessione) {
+  const d = leggi();
+  const esistente = sessione.id && d.sessioni.find((s) => s.id === sessione.id);
+  if (esistente) return copia(esistente);
   const salvata = { id: nuovoId(), ...copia(sessione) };
-  leggi().sessioni.push(salvata);
+  d.sessioni.push(salvata);
   scrivi();
   return copia(salvata);
 }

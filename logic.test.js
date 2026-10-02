@@ -21,6 +21,7 @@ import {
   pesoPrevisto,
   tolleranzaInLinea,
   dovreiEssereQui,
+  prossimiArgomenti,
   statoAvanzamento,
   streak,
 } from './logic.js';
@@ -512,5 +513,23 @@ describe('titoliDaElenco', () => {
 
   test('testo vuoto', () => {
     assert.deepEqual(titoliDaElenco(''), []);
+  });
+});
+
+describe('prossimiArgomenti', () => {
+  test('i primi tre non fatti, nell\'ordine del programma', () => {
+    const argomenti = con(programma(), { A: { stato: 'fatto' }, C: { stato: 'in_corso' } });
+    argomenti.push(argomento('E', 1, 5));
+    assert.deepEqual(prossimiArgomenti(argomenti.reverse()).map((a) => a.id), ['B', 'C', 'D']);
+  });
+
+  test('quanti se ne chiedono', () => {
+    assert.deepEqual(prossimiArgomenti(programma(), 2).map((a) => a.id), ['A', 'B']);
+  });
+
+  test('programma vuoto o tutto completato', () => {
+    assert.deepEqual(prossimiArgomenti([]), []);
+    const tutti = programma().map((a) => ({ ...a, stato: 'fatto' }));
+    assert.deepEqual(prossimiArgomenti(tutti), []);
   });
 });

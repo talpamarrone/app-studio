@@ -122,6 +122,13 @@ describe('sessioni', () => {
     assert.ok(s.id);
     assert.deepEqual(storage.getSessioni(), [s]);
   });
+
+  test('aggiungiSessione con un id già registrato non la duplica', () => {
+    const sessione = { id: 'pomodoro-1', argomentoId: 'a1', data: '2026-10-05', durataMinuti: 25 };
+    storage.aggiungiSessione(sessione);
+    storage.aggiungiSessione(sessione);
+    assert.equal(storage.getSessioni().length, 1);
+  });
 });
 
 describe('timer', () => {

@@ -161,7 +161,7 @@ describe('avanzaTimer', () => {
       {
         tipo: 'pomodoro_finito',
         fine: alle(9, 25),
-        sessione: { argomentoId: 'A', data: '2026-10-05', durataMinuti: 25 },
+        sessione: { id: `pomodoro-${alle(9)}`, argomentoId: 'A', data: '2026-10-05', durataMinuti: 25 },
       },
     ]);
     assert.equal(stato.daConfermare, 'A');

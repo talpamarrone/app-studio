@@ -1,4 +1,4 @@
-// Schermata Programma con il timer: legge dallo storage, calcola con logic.js, disegna.
+// Schermate Oggi e Programma: legge dallo storage, calcola con logic.js, disegna.
 // Ogni modifica salva e ridisegna tutto: i dati sono pochi.
 
 import * as storage from './storage.js';
@@ -15,13 +15,17 @@ import {
   formattaTempo,
   giorniStudioRimasti,
   giorniStudioTotali,
+  isGiornoStudio,
   isScaduto,
   mettiInPausa,
+  obiettivoOggi,
   percentualeCompletata,
   pesoRimanente,
   pomodoriDelGiorno,
   pomodoriPerArgomento,
+  prossimiArgomenti,
   riprendi,
+  statoAvanzamento,
   tempoRimanente,
   tempoTrascorso,
   titoliDaElenco,
@@ -73,6 +77,44 @@ function esameCorrente() {
   return storage.getEsami()[0] ?? null;
 }
 
+function quandoEsame(esame, giorno) {
+  const mancano = differenzaGiorni(giorno, esame.dataEsame);
+  if (mancano > 1) return `tra ${mancano} giorni`;
+  if (mancano === 1) return 'domani';
+  if (mancano === 0) return 'oggi';
+  return 'passato';
+}
+
+// ---------------------------------------------------------------- schermate
+
+// La schermata sta nell'indirizzo (#oggi, #programma): il tasto indietro funziona.
+const VISTE = { oggi: 'Oggi', programma: 'Programma' };
+
+function vistaCorrente() {
+  const vista = location.hash.slice(1);
+  return vista in VISTE ? vista : 'oggi';
+}
+
+function titoloPagina() {
+  return `${VISTE[vistaCorrente()]} · App studio`;
+}
+
+function mostraVista() {
+  const vista = vistaCorrente();
+  document.body.dataset.vista = vista;
+  $('#titolo-vista').textContent = VISTE[vista];
+  for (const link of document.querySelectorAll('[data-vai]')) {
+    if (link.dataset.vai === vista) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  }
+}
+
+window.addEventListener('hashchange', () => {
+  mostraVista();
+  window.scrollTo(0, 0);
+  aggiornaDisplay();
+});
+
 // ---------------------------------------------------------------- disegno
 
 function render() {
@@ -85,27 +127,191 @@ function render() {
   const sessioni = storage.getSessioni();
 
   $('#benvenuto').hidden = Boolean(esame);
+  $('#oggi').hidden = !esame;
   $('#esame').hidden = !esame;
   $('#riepilogo').hidden = !esame;
   $('#sezione-argomenti').hidden = !esame;
 
   if (esame) {
+    renderOggi(esame, argomenti, sessioni, giorno);
     renderEsame(esame, giorno);
     renderRiepilogo(esame, argomenti, sessioni, giorno);
     renderArgomenti(esame, argomenti, sessioni, giorno);
   }
   renderTimer(esame, argomenti, sessioni, giorno);
+  renderProssimi(esame, argomenti, sessioni);
   renderEsito(argomenti);
   renderCompiti();
 }
 
+// ---------------------------------------------------------------- oggi
+
+const NOMI_AVANZAMENTO = { in_anticipo: 'In anticipo', in_linea: 'In linea', indietro: 'Indietro' };
+
+/** Pallini dei pomodori di oggi: pieni quelli fatti. Oltre i 16 basta il numero. */
+function pallini(fatti, obiettivo) {
+  const totale = Math.max(fatti, obiettivo);
+  if (totale === 0 || totale > 16) return '';
+  const punti = Array.from({ length: totale }, (_, i) => `<span class="${i < fatti ? 'pieno' : ''}"></span>`);
+  return `<div class="pallini" aria-hidden="true">${punti.join('')}</div>`;
+}
+
+function renderOggi(esame, argomenti, sessioni, giorno) {
+  const obiettivo = obiettivoOggi(esame, argomenti, sessioni, giorno);
+  const fatti = pomodoriDelGiorno(sessioni, giorno);
+  const rimanente = pesoRimanente(argomenti, sessioni);
+  const pomodori = (n) => plurale(n, 'pomodoro', 'pomodori');
+  const giorni = (n) => plurale(n, 'giorno', 'giorni');
+
+  // Un riquadro con titolo e frase per i casi in cui non c'è un obiettivo normale.
+  const avviso = (titolo, testo, azione = '') => `
+    <div class="oggi-avviso">
+      <h2>${titolo}</h2>
+      <p>${testo}</p>
+      ${azione}
+    </div>`;
+  const fattiOggi = fatti ? `<p class="nota">Oggi hai fatto ${pomodori(fatti)}.</p>` : '';
+
+  let corpo;
+  let mostraAvanzamento = true;
+
+  if (obiettivo.stato === 'esame_passato') {
+    mostraAvanzamento = false;
+    corpo = avviso(
+      'L\'esame è passato',
+      `Era ${esc(formattaData(esame.dataEsame, { weekday: 'long', day: 'numeric', month: 'long' }))}. Se devi ridarlo, aggiorna la data: il piano si ricalcola da solo.`,
+      '<button type="button" class="secondario" data-apri="esame">Modifica esame</button>',
+    );
+  } else if (obiettivo.stato === 'esame_oggi') {
+    mostraAvanzamento = false;
+    corpo = avviso('Oggi è il giorno dell\'esame', 'In bocca al lupo! Niente obiettivo oggi: al massimo un ripasso leggero.') + fattiOggi;
+  } else if (argomenti.length === 0) {
+    mostraAvanzamento = false;
+    corpo = avviso(
+      'Il programma è vuoto',
+      'Aggiungi gli argomenti da studiare con il loro peso in pomodori: l\'obiettivo di ogni giorno si calcola da lì.',
+      '<a href="#programma" class="bottone primario">Vai al programma</a>',
+    );
+  } else if (obiettivo.stato === 'non_iniziato') {
+    mostraAvanzamento = false;
+    corpo = avviso(
+      `Lo studio inizia ${esc(formattaData(esame.dataInizio, { weekday: 'long', day: 'numeric', month: 'long' }))}`,
+      'Fino ad allora niente obiettivo. Se vuoi portarti avanti, il timer funziona già e i pomodori contano.',
+    ) + fattiOggi;
+  } else if (rimanente === 0) {
+    mostraAvanzamento = false;
+    const ripasso = obiettivo.stato === 'in_ripasso' ? 'Sei nei giorni di ripasso: usali per ripassare con calma.' : 'Usa il tempo che resta per ripassare.';
+    corpo = avviso('Programma completato 🎉', `Hai finito tutti gli argomenti. ${ripasso}`) + fattiOggi;
+  } else if (obiettivo.stato === 'riposo') {
+    corpo = avviso(
+      'Oggi è giorno di riposo',
+      'Niente obiettivo oggi: ricarica le energie. Se studi lo stesso, i pomodori contano e domani avrai meno da fare.',
+    ) + fattiOggi;
+  } else {
+    const n = obiettivo.obiettivo;
+    const mancano = Math.max(0, n - fatti);
+    const frase = mancano === 0
+      ? 'Obiettivo raggiunto! Ogni pomodoro in più ti porta avanti.'
+      : `Ne ${mancano === 1 ? 'manca 1' : `mancano ${mancano}`} per l'obiettivo di oggi.`;
+
+    // Perché l'obiettivo vale quello che vale. Si calcola sul peso di inizio
+    // giornata: se oggi hai già studiato, lo si dice, altrimenti i conti non tornano.
+    const resta = obiettivo.pesoRimanente === rimanente ? 'restano' : 'a inizio giornata restavano';
+    let spiegazione;
+    if (obiettivo.stato === 'in_ripasso') {
+      spiegazione = `Sei nei giorni di ripasso, ma ${resta} ${pomodori(obiettivo.pesoRimanente)} di programma, da dividere sui ${giorni(obiettivo.giorniRimasti)} che mancano all'esame.`;
+    } else if (!isGiornoStudio(giorno, esame)) {
+      spiegazione = `Prima dell'esame restano solo giorni di riposo: i ${pomodori(obiettivo.pesoRimanente)} di programma si dividono sui ${giorni(obiettivo.giorniRimasti)} che mancano.`;
+    } else {
+      spiegazione = `${resta[0].toUpperCase()}${resta.slice(1)} ${pomodori(obiettivo.pesoRimanente)} in ${giorni(obiettivo.giorniRimasti)} di studio, oggi compreso.`;
+    }
+
+    corpo = `
+      <div class="obiettivo" role="group" aria-label="Pomodori di oggi: ${fatti} su ${n}">
+        <p class="obiettivo-numeri"><strong>${fatti}</strong><span>/ ${n}</span></p>
+        <p class="obiettivo-etichetta">pomodori oggi</p>
+        ${pallini(fatti, n)}
+        <p class="obiettivo-frase ${mancano === 0 ? 'raggiunto' : ''}">${frase}</p>
+      </div>
+      ${obiettivo.stato === 'in_ripasso' ? `<p class="oggi-fase">Ripasso</p>` : ''}
+      <p class="nota">${spiegazione}</p>`;
+  }
+
+  $('#oggi').innerHTML = `
+    <p class="oggi-esame">
+      <span>${esc(formattaData(giorno, { weekday: 'long', day: 'numeric', month: 'long' }))}</span>
+      <span>${esc(esame.nome)} · esame <strong>${quandoEsame(esame, giorno)}</strong></span>
+    </p>
+    ${corpo}
+    ${mostraAvanzamento ? renderAvanzamento(esame, argomenti, sessioni, giorno) : ''}`;
+}
+
+function renderAvanzamento(esame, argomenti, sessioni, giorno) {
+  const { stato, completato, previsto } = statoAvanzamento(esame, argomenti, sessioni, giorno);
+  const scarto = Math.max(1, Math.round(Math.abs(completato - previsto)));
+  const circa = `circa ${plurale(scarto, 'pomodoro', 'pomodori')}`;
+
+  let frase;
+  if (stato === 'in_anticipo') frase = `Hai ${circa} di vantaggio sul ritmo costante: ottimo margine.`;
+  else if (stato === 'indietro') frase = `Sei indietro di ${circa} sul ritmo costante. L'obiettivo di oggi tiene già conto del ritardo: seguilo e recuperi.`;
+  else frase = 'Sei al passo con il piano: raggiungi l\'obiettivo di oggi e resti in linea.';
+
+  const qui = dovreiEssereQui(esame, argomenti, giorno);
+  const dove = qui
+    ? `A ritmo costante, oggi arriveresti a <strong>${esc(qui.titolo)}</strong>.`
+    : 'A ritmo costante, a questo punto avresti finito il programma.';
+
+  return `
+    <div class="avanzamento" data-stato="${stato}">
+      <span class="etichetta-stato">${NOMI_AVANZAMENTO[stato]}</span>
+      <p>${frase}</p>
+      <p class="nota">${dove}</p>
+    </div>`;
+}
+
+function renderProssimi(esame, argomenti, sessioni) {
+  // A esame passato non c'è un "prossimo" da studiare.
+  const prossimi = esame && faseEsame(esame, oggi()) !== 'esame_passato' ? prossimiArgomenti(argomenti, 3) : [];
+  $('#sezione-prossimi').hidden = prossimi.length === 0;
+  if (!prossimi.length) return;
+
+  const pomodori = pomodoriPerArgomento(sessioni);
+  const { attivo } = storage.getTimer();
+  const nelTimer = attivo ? attivo.argomentoId : argomentoNelTimer(argomenti);
+
+  $('#lista-prossimi').innerHTML = prossimi
+    .map((a) => {
+      const scelto = a.id === nelTimer;
+      const azione = scelto
+        ? `<span class="nel-timer">${attivo?.fase === 'pomodoro' ? 'In corso' : 'Nel timer'}</span>`
+        : attivo
+          ? ''
+          : `<button type="button" class="secondario piccolo" data-scegli="${esc(a.id)}">Scegli</button>`;
+      return `
+      <li class="prossimo" data-stato="${a.stato}">
+        <div class="prossimo-testo">
+          <span>${esc(a.titolo)}</span>
+          <small>${NOMI_STATO[a.stato]} · ${pomodori.get(a.id) ?? 0}/${a.peso} 🍅</small>
+        </div>
+        ${azione}
+      </li>`;
+    })
+    .join('');
+}
+
+$('#lista-prossimi').addEventListener('click', (e) => {
+  const id = e.target.closest('[data-scegli]')?.dataset.scegli;
+  if (!id) return;
+  argomentoScelto = id;
+  render();
+  $('#timer [data-timer="avvia"]')?.focus();
+  $('#timer').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+});
+
+// ---------------------------------------------------------------- programma
+
 function renderEsame(esame, giorno) {
-  const mancano = differenzaGiorni(giorno, esame.dataEsame);
-  let quando;
-  if (mancano > 1) quando = `tra ${mancano} giorni`;
-  else if (mancano === 1) quando = 'domani';
-  else if (mancano === 0) quando = 'oggi';
-  else quando = 'passato';
+  const quando = quandoEsame(esame, giorno);
 
   const riposo = GIORNI.filter((g) => esame.giorniRiposo.includes(g.valore)).map((g) => g.nome);
   const dettagli = [
@@ -472,11 +678,22 @@ const VELOCE = new URLSearchParams(location.search).has('veloce');
 const MS_MINUTO_APP = VELOCE ? 1000 : MS_MINUTO;
 
 const NOMI_FASE = { pomodoro: 'Pomodoro', pausa_breve: 'Pausa breve', pausa_lunga: 'Pausa lunga' };
-const TITOLO_PAGINA = document.title;
-
 // Argomento scelto nel menu del timer; se diventa fatto si torna al primo non fatto.
 let argomentoScelto = null;
 let ticker = null;
+
+// Nel menu solo gli argomenti da finire; a programma completato tutti, per ripassare.
+function argomentiSceglibili(argomenti) {
+  return argomenti.some((a) => a.stato !== 'fatto') ? argomenti.filter((a) => a.stato !== 'fatto') : argomenti;
+}
+
+/** Id dell'argomento selezionato nel timer fermo; null se non ci sono argomenti. */
+function argomentoNelTimer(argomenti) {
+  const scegliibili = argomentiSceglibili(argomenti);
+  if (!scegliibili.length) return null;
+  return argomentoProposto(argomenti, argomentoScelto)?.id
+    ?? (scegliibili.some((a) => a.id === argomentoScelto) ? argomentoScelto : scegliibili[0].id);
+}
 
 /** Registra i pomodori scaduti e fa partire le pause. Non disegna. */
 function aggiornaStatoTimer() {
@@ -523,10 +740,8 @@ function renderTimer(esame, argomenti, sessioni, giorno) {
     if (argomenti.length === 0) {
       sezione.innerHTML = `${testa('Pomodoro')}<p class="nota">Aggiungi un argomento per usare il timer.</p>`;
     } else {
-      // Nel menu solo gli argomenti da finire; a programma completato tutti, per ripassare.
-      const scegliibili = argomenti.some((a) => a.stato !== 'fatto') ? argomenti.filter((a) => a.stato !== 'fatto') : argomenti;
-      const selezionato = argomentoProposto(argomenti, argomentoScelto)?.id
-        ?? (scegliibili.some((a) => a.id === argomentoScelto) ? argomentoScelto : scegliibili[0].id);
+      const scegliibili = argomentiSceglibili(argomenti);
+      const selezionato = argomentoNelTimer(argomenti);
       const durata = storage.getImpostazioni().durataPomodoro;
       sezione.innerHTML = `
         ${testa('Pomodoro')}
@@ -565,7 +780,7 @@ function renderTimer(esame, argomenti, sessioni, giorno) {
 function aggiornaDisplay() {
   const { attivo } = storage.getTimer();
   if (!attivo) {
-    document.title = TITOLO_PAGINA;
+    document.title = titoloPagina();
     return;
   }
   const ora = Date.now();
@@ -599,7 +814,11 @@ function modificaTimer(cambia) {
 }
 
 $('#timer').addEventListener('change', (e) => {
-  if (e.target.id === 'timer-argomento') argomentoScelto = e.target.value;
+  if (e.target.id !== 'timer-argomento') return;
+  argomentoScelto = e.target.value;
+  // Ridisegna i prossimi argomenti, che mostrano quale è nel timer.
+  render();
+  $('#timer-argomento')?.focus();
 });
 
 $('#timer').addEventListener('click', (e) => {
@@ -807,4 +1026,5 @@ window.addEventListener('storage', () => {
   render();
 });
 
+mostraVista();
 render();
