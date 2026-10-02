@@ -56,6 +56,11 @@ Il modello supporta più esami fin da subito, anche se l'interfaccia iniziale ne
 - Timer: `?veloce` nell'indirizzo fa durare ogni minuto un secondo, per le prove.
 - Timer: la sessione ha id `pomodoro-<inizio>` e lo storage ignora un id già registrato, così due schede aperte non contano due volte lo stesso pomodoro.
 - Navigazione: una sola pagina, la schermata sta nell'indirizzo (`#oggi`, `#programma`), barra in basso. Oggi è la schermata di partenza.
+- Streak migliore: la più lunga di sempre fino a oggi, con le stesse regole della streak attuale.
+- Calendario: colore in 4 livelli rispetto a un giorno di ritmo costante (fino a metà, fino al ritmo, fino a 1,5 volte, oltre). Riposo a righe, ripasso con bordo tratteggiato, esame con bordo pieno e 🎓; il ripasso vince sul riposo.
+- Grafico 14 giorni: l'obiettivo di ogni giorno passato si ricostruisce con `obiettivoOggi` su quel giorno (sessioni precedenti e `dataCompletamento`), non si salva.
+- Obiettivo raggiunto: il messaggio compare nella domanda "finito?" (e nella notifica) solo per il pomodoro che porta i pomodori del giorno esattamente all'obiettivo; non si salva.
+- Totale pomodori fatti = tutte le sessioni, anche di argomenti eliminati.
 - Oggi: la frase sotto l'obiettivo usa il peso rimanente a inizio giornata (quello dell'obiettivo); se oggi hai già studiato lo dice ("a inizio giornata restavano…").
 
 ## Schermate

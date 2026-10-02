@@ -24,6 +24,14 @@ import {
   prossimiArgomenti,
   statoAvanzamento,
   streak,
+  streakMigliore,
+  pomodoriPerGiorno,
+  tipoGiorno,
+  livelloPomodori,
+  grigliaMese,
+  aggiungiMesi,
+  storicoGiorni,
+  raggiungeObiettivo,
 } from './logic.js';
 
 // Calendario di riferimento (ottobre 2026):
@@ -531,5 +539,152 @@ describe('prossimiArgomenti', () => {
     assert.deepEqual(prossimiArgomenti([]), []);
     const tutti = programma().map((a) => ({ ...a, stato: 'fatto' }));
     assert.deepEqual(prossimiArgomenti(tutti), []);
+  });
+});
+
+describe('streakMigliore', () => {
+  const riposo = [DOMENICA];
+
+  test('nessuna sessione', () => {
+    assert.equal(streakMigliore([], riposo, '2026-10-07'), 0);
+  });
+
+  test('la più lunga anche se ormai interrotta', () => {
+    const s = [
+      ...sessioni('A', '2026-10-01'), ...sessioni('A', '2026-10-02'), ...sessioni('A', '2026-10-03'),
+      ...sessioni('A', '2026-10-06'), ...sessioni('A', '2026-10-07'),
+    ];
+    assert.equal(streakMigliore(s, riposo, '2026-10-07'), 3);
+    assert.equal(streak(s, riposo, '2026-10-07'), 2);
+  });
+
+  test('il riposo non la interrompe, studiare di riposo fa +1', () => {
+    const s = [...sessioni('A', '2026-10-09'), ...sessioni('A', '2026-10-10'), ...sessioni('A', '2026-10-12')];
+    assert.equal(streakMigliore(s, riposo, '2026-10-12'), 3);
+    const conDomenica = [...s, ...sessioni('A', '2026-10-11')];
+    assert.equal(streakMigliore(conDomenica, riposo, '2026-10-12'), 4);
+  });
+
+  test('coincide con la streak attuale quando è la più lunga', () => {
+    const s = [...sessioni('A', '2026-10-05'), ...sessioni('A', '2026-10-06')];
+    assert.equal(streakMigliore(s, riposo, '2026-10-07'), 2);
+    assert.equal(streak(s, riposo, '2026-10-07'), 2);
+  });
+
+  test('le sessioni future non contano', () => {
+    const s = [...sessioni('A', '2026-10-06'), ...sessioni('A', '2026-10-07'), ...sessioni('A', '2026-10-08')];
+    assert.equal(streakMigliore(s, riposo, '2026-10-06'), 1);
+  });
+});
+
+describe('calendario', () => {
+  test('pomodoriPerGiorno', () => {
+    const s = [...sessioni('A', '2026-10-05', 2), ...sessioni('B', '2026-10-05'), ...sessioni('B', '2026-10-07')];
+    const m = pomodoriPerGiorno(s);
+    assert.equal(m.get('2026-10-05'), 3);
+    assert.equal(m.get('2026-10-07'), 1);
+    assert.equal(m.get('2026-10-06'), undefined);
+  });
+
+  test('tipoGiorno', () => {
+    assert.equal(tipoGiorno('2026-10-04', esame), 'fuori');
+    assert.equal(tipoGiorno('2026-10-05', esame), 'studio');
+    assert.equal(tipoGiorno('2026-10-11', esame), 'riposo');
+    assert.equal(tipoGiorno('2026-10-17', esame), 'ripasso');
+    assert.equal(tipoGiorno('2026-10-18', esame), 'ripasso', 'il ripasso vince sul riposo');
+    assert.equal(tipoGiorno('2026-10-19', esame), 'esame');
+    assert.equal(tipoGiorno('2026-10-20', esame), 'fuori');
+  });
+
+  test('livelloPomodori rispetto al ritmo costante', () => {
+    assert.equal(livelloPomodori(0, 4), 0);
+    assert.equal(livelloPomodori(1, 4), 1);
+    assert.equal(livelloPomodori(2, 4), 1);
+    assert.equal(livelloPomodori(3, 4), 2);
+    assert.equal(livelloPomodori(4, 4), 2);
+    assert.equal(livelloPomodori(6, 4), 3);
+    assert.equal(livelloPomodori(7, 4), 4);
+    assert.equal(livelloPomodori(30, 4), 4);
+  });
+
+  test('livelloPomodori con riferimento sotto 1 usa 1', () => {
+    assert.equal(livelloPomodori(1, 0), 2);
+    assert.equal(livelloPomodori(2, 0.3), 4);
+  });
+
+  test('grigliaMese: settimane da lunedì', () => {
+    // 1 ottobre 2026 è giovedì: tre posti vuoti prima.
+    const g = grigliaMese('2026-10');
+    assert.equal(g.length % 7, 0);
+    assert.deepEqual(g.slice(0, 4), [null, null, null, '2026-10-01']);
+    assert.equal(g.filter(Boolean).length, 31);
+    assert.equal(g.filter(Boolean).at(-1), '2026-10-31');
+  });
+
+  test('grigliaMese: mese che inizia di lunedì e febbraio bisestile', () => {
+    assert.equal(grigliaMese('2026-06')[0], '2026-06-01');
+    assert.equal(grigliaMese('2028-02').filter(Boolean).length, 29);
+  });
+
+  test('aggiungiMesi', () => {
+    assert.equal(aggiungiMesi('2026-10', 1), '2026-11');
+    assert.equal(aggiungiMesi('2026-12', 1), '2027-01');
+    assert.equal(aggiungiMesi('2026-01', -1), '2025-12');
+    assert.equal(aggiungiMesi('2026-10', -14), '2025-08');
+  });
+});
+
+describe('storicoGiorni', () => {
+  test('14 giorni dal più vecchio, con pomodori e tipo', () => {
+    const s = [...sessioni('A', '2026-10-05', 2), ...sessioni('A', '2026-10-12', 3)];
+    const st = storicoGiorni(esame, programma(), s, '2026-10-12');
+    assert.equal(st.length, 14);
+    assert.equal(st[0].data, '2026-09-29');
+    assert.equal(st.at(-1).data, '2026-10-12');
+    assert.equal(st.at(-1).pomodori, 3);
+    assert.equal(st.find((g) => g.data === '2026-10-05').pomodori, 2);
+    assert.equal(st[0].tipo, 'fuori');
+    assert.equal(st.find((g) => g.data === '2026-10-11').tipo, 'riposo');
+  });
+
+  test('obiettivo di ciascun giorno ricostruito dai dati di allora', () => {
+    // A fatto il 9, con 4 pomodori tra il 5 e l'8.
+    const args = con(programma(), { A: { stato: 'fatto', dataCompletamento: '2026-10-09' } });
+    const s = [...sessioni('A', '2026-10-05'), ...sessioni('A', '2026-10-08', 3)];
+    const st = storicoGiorni(esame, args, s, '2026-10-12', 9);
+    const obiettivo = (d) => st.find((g) => g.data === d).obiettivo;
+    assert.equal(obiettivo('2026-10-05'), 2, 'primo giorno: 22 / 11');
+    assert.equal(obiettivo('2026-10-09'), 3, 'A ancora in corso con 4: 18 / 7 → 3');
+    assert.equal(obiettivo('2026-10-11'), 0, 'riposo');
+    assert.equal(obiettivo('2026-10-12'), 4, '18 / 5 → 4');
+    assert.equal(obiettivo('2026-10-04'), 0, "prima dell'inizio");
+  });
+
+  test("dall'esame in poi niente obiettivo", () => {
+    const st = storicoGiorni(esame, programma(), [], '2026-10-20', 3);
+    assert.deepEqual(st.map((g) => g.obiettivo), [22, null, null]);
+    assert.deepEqual(st.map((g) => g.tipo), ['ripasso', 'esame', 'fuori']);
+  });
+});
+
+describe('raggiungeObiettivo', () => {
+  // Il 5/10 l'obiettivo è 2.
+  const nuova = (data) => ({ id: 'nuova', argomentoId: 'A', data, durataMinuti: 25 });
+
+  test("vero solo per il pomodoro che arriva all'obiettivo", () => {
+    assert.equal(raggiungeObiettivo(esame, programma(), [], nuova('2026-10-05')), false);
+    assert.equal(raggiungeObiettivo(esame, programma(), sessioni('A', '2026-10-05'), nuova('2026-10-05')), true);
+    assert.equal(raggiungeObiettivo(esame, programma(), sessioni('A', '2026-10-05', 2), nuova('2026-10-05')), false);
+  });
+
+  test('le sessioni di altri giorni non contano', () => {
+    assert.equal(raggiungeObiettivo(esame, programma(), sessioni('A', '2026-10-06'), nuova('2026-10-05')), false);
+  });
+
+  test('riposo, esame e programma finito: mai', () => {
+    assert.equal(raggiungeObiettivo(esame, programma(), [], nuova('2026-10-11')), false);
+    assert.equal(raggiungeObiettivo(esame, programma(), [], nuova('2026-10-19')), false);
+    const tutto = programma().map((a) => ({ ...a, stato: 'fatto', dataCompletamento: '2026-10-01' }));
+    assert.equal(raggiungeObiettivo(esame, tutto, [], nuova('2026-10-12')), false);
   });
 });

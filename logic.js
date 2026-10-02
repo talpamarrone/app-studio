@@ -279,6 +279,104 @@ export function streak(sessioni, giorniRiposo, oggi) {
   return n;
 }
 
+/**
+ * La streak più lunga di sempre, fino a oggi, con le stesse regole di `streak`:
+ * il riposo senza studio non la interrompe, studiare di riposo fa +1.
+ */
+export function streakMigliore(sessioni, giorniRiposo, oggi) {
+  const studiati = new Set(sessioni.map((s) => s.data).filter((d) => d <= oggi));
+  if (studiati.size === 0) return 0;
+  const primo = [...studiati].sort()[0];
+
+  let migliore = 0;
+  let corrente = 0;
+  for (let d = primo; d <= oggi; d = aggiungiGiorni(d, 1)) {
+    if (studiati.has(d)) migliore = Math.max(migliore, ++corrente);
+    else if (!isGiornoRiposo(d, giorniRiposo)) corrente = 0;
+  }
+  return migliore;
+}
+
+// ---------------------------------------------------------------- calendario e storico
+
+/** Pomodori fatti per data: Map 'YYYY-MM-DD' → numero. */
+export function pomodoriPerGiorno(sessioni) {
+  const conteggio = new Map();
+  for (const s of sessioni) conteggio.set(s.data, (conteggio.get(s.data) ?? 0) + 1);
+  return conteggio;
+}
+
+/**
+ * Che giorno è `data` nel piano dell'esame:
+ * 'fuori' (prima dell'inizio o dopo l'esame) | 'esame' | 'ripasso' | 'riposo' | 'studio'.
+ * Il ripasso vince sul riposo: sono giorni di calendario.
+ */
+export function tipoGiorno(data, esame) {
+  if (data === esame.dataEsame) return 'esame';
+  if (data < esame.dataInizio || data > esame.dataEsame) return 'fuori';
+  if (data >= inizioRipasso(esame)) return 'ripasso';
+  if (isGiornoRiposo(data, esame.giorniRiposo)) return 'riposo';
+  return 'studio';
+}
+
+/**
+ * Intensità di un giorno da 0 a 4, rispetto a un giorno di ritmo costante
+ * (`riferimento`, minimo 1): fino a metà → 1, fino al ritmo → 2, fino a una
+ * volta e mezza → 3, oltre → 4.
+ */
+export function livelloPomodori(pomodori, riferimento) {
+  if (pomodori <= 0) return 0;
+  const rif = Math.max(1, riferimento);
+  return Math.min(4, Math.ceil((pomodori / rif) * 2 - EPSILON));
+}
+
+/**
+ * Le celle di un mese ('YYYY-MM') in settimane da lunedì a domenica:
+ * una lista di date, con null per i posti vuoti all'inizio e alla fine.
+ */
+export function grigliaMese(mese) {
+  const primo = `${mese}-01`;
+  const celle = Array((giornoSettimana(primo) + 6) % 7).fill(null);
+  for (let d = primo; d.startsWith(mese); d = aggiungiGiorni(d, 1)) celle.push(d);
+  while (celle.length % 7) celle.push(null);
+  return celle;
+}
+
+/** Il mese 'YYYY-MM' spostato di `n` mesi. */
+export function aggiungiMesi(mese, n) {
+  const [anno, m] = mese.split('-').map(Number);
+  const totale = anno * 12 + (m - 1) + n;
+  return `${Math.floor(totale / 12)}-${String((totale % 12) + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Gli ultimi `n` giorni fino a oggi, dal più vecchio: { data, pomodori, obiettivo, tipo }.
+ * obiettivo è quello che valeva quel giorno, ricostruito dai dati (sessioni
+ * precedenti e date di completamento degli argomenti); null dall'esame in poi.
+ */
+export function storicoGiorni(esame, argomenti, sessioni, oggi, n = 14) {
+  const perGiorno = pomodoriPerGiorno(sessioni);
+  return Array.from({ length: n }, (_, i) => {
+    const data = aggiungiGiorni(oggi, i - n + 1);
+    return {
+      data,
+      pomodori: perGiorno.get(data) ?? 0,
+      obiettivo: obiettivoOggi(esame, argomenti, sessioni, data).obiettivo,
+      tipo: tipoGiorno(data, esame),
+    };
+  });
+}
+
+/**
+ * Vero se registrare `sessione` porta i pomodori del suo giorno esattamente
+ * all'obiettivo di quel giorno. `sessioni` sono quelle già registrate, senza la nuova.
+ */
+export function raggiungeObiettivo(esame, argomenti, sessioni, sessione) {
+  const { obiettivo } = obiettivoOggi(esame, argomenti, sessioni, sessione.data);
+  if (!obiettivo) return false;
+  return pomodoriDelGiorno(sessioni, sessione.data) + 1 === obiettivo;
+}
+
 // ---------------------------------------------------------------- timer pomodoro
 //
 // Un timer è un dato: { fase, argomentoId, durataMinuti, durataMs, inizio, pausaMs, inPausaDa }.

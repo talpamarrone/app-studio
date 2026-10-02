@@ -1,9 +1,10 @@
-// Schermate Oggi e Programma: legge dallo storage, calcola con logic.js, disegna.
+// Schermate Oggi, Programma e Progressi: legge dallo storage, calcola con logic.js, disegna.
 // Ogni modifica salva e ridisegna tutto: i dati sono pochi.
 
 import * as storage from './storage.js';
 import {
   MS_MINUTO,
+  aggiungiMesi,
   argomentoProposto,
   avanzaTimer,
   avviaFase,
@@ -15,20 +16,32 @@ import {
   formattaTempo,
   giorniStudioRimasti,
   giorniStudioTotali,
+  grigliaMese,
+  isGiornoRiposo,
   isGiornoStudio,
   isScaduto,
+  livelloPomodori,
   mettiInPausa,
   obiettivoOggi,
   percentualeCompletata,
+  pesoCompletato,
   pesoRimanente,
+  pesoTotale,
   pomodoriDelGiorno,
   pomodoriPerArgomento,
+  pomodoriPerGiorno,
   prossimiArgomenti,
+  raggiungeObiettivo,
   riprendi,
   statoAvanzamento,
+  storicoGiorni,
+  streak,
+  streakMigliore,
   tempoRimanente,
   tempoTrascorso,
+  tipoGiorno,
   titoliDaElenco,
+  tolleranzaInLinea,
 } from './logic.js';
 
 // Lunedì per primo; i valori seguono Date#getDay (0 = domenica).
@@ -87,8 +100,8 @@ function quandoEsame(esame, giorno) {
 
 // ---------------------------------------------------------------- schermate
 
-// La schermata sta nell'indirizzo (#oggi, #programma): il tasto indietro funziona.
-const VISTE = { oggi: 'Oggi', programma: 'Programma' };
+// La schermata sta nell'indirizzo (#oggi, #programma, #progressi): il tasto indietro funziona.
+const VISTE = { oggi: 'Oggi', programma: 'Programma', progressi: 'Progressi' };
 
 function vistaCorrente() {
   const vista = location.hash.slice(1);
@@ -131,12 +144,16 @@ function render() {
   $('#esame').hidden = !esame;
   $('#riepilogo').hidden = !esame;
   $('#sezione-argomenti').hidden = !esame;
+  $('#progressi-riepilogo').hidden = !esame;
+  $('#progressi-grafico').hidden = !esame;
+  $('#progressi-calendario').hidden = !esame;
 
   if (esame) {
     renderOggi(esame, argomenti, sessioni, giorno);
     renderEsame(esame, giorno);
     renderRiepilogo(esame, argomenti, sessioni, giorno);
     renderArgomenti(esame, argomenti, sessioni, giorno);
+    renderProgressi(esame, argomenti, sessioni, giorno);
   }
   renderTimer(esame, argomenti, sessioni, giorno);
   renderProssimi(esame, argomenti, sessioni);
@@ -238,12 +255,30 @@ function renderOggi(esame, argomenti, sessioni, giorno) {
   }
 
   $('#oggi').innerHTML = `
-    <p class="oggi-esame">
-      <span>${esc(formattaData(giorno, { weekday: 'long', day: 'numeric', month: 'long' }))}</span>
-      <span>${esc(esame.nome)} · esame <strong>${quandoEsame(esame, giorno)}</strong></span>
-    </p>
+    <div class="oggi-testa">
+      <p class="oggi-esame">
+        <span>${esc(formattaData(giorno, { weekday: 'long', day: 'numeric', month: 'long' }))}</span>
+        <span>${esc(esame.nome)} · esame <strong>${quandoEsame(esame, giorno)}</strong></span>
+      </p>
+      ${renderStreakOggi(esame, sessioni, giorno, fatti)}
+    </div>
     ${corpo}
     ${mostraAvanzamento ? renderAvanzamento(esame, argomenti, sessioni, giorno) : ''}`;
+}
+
+/** La streak attuale, in piccolo: porta alla schermata Progressi. */
+function renderStreakOggi(esame, sessioni, giorno, fattiOggi) {
+  const n = streak(sessioni, esame.giorniRiposo, giorno);
+  // Se oggi è un giorno di studio e non ho ancora studiato, la streak è in gioco.
+  const inGioco = n > 0 && fattiOggi === 0 && !isGiornoRiposo(giorno, esame.giorniRiposo);
+  const titolo = n === 0
+    ? 'Nessuna streak in corso: un pomodoro oggi la fa partire'
+    : `${plurale(n, 'giorno', 'giorni')} di studio di fila${inGioco ? ': un pomodoro oggi la allunga' : ''}`;
+  return `
+    <a href="#progressi" class="oggi-streak ${n === 0 ? 'spenta' : ''} ${inGioco ? 'in-gioco' : ''}"
+       title="${esc(titolo)}" aria-label="Streak: ${esc(titolo)}">
+      <span aria-hidden="true">🔥</span><strong>${n}</strong><small>${n === 1 ? 'giorno' : 'giorni'}</small>
+    </a>`;
 }
 
 function renderAvanzamento(esame, argomenti, sessioni, giorno) {
@@ -406,6 +441,154 @@ function renderCompiti() {
         .join('')
     : `<li class="vuoto">Nessun compito.</li>`;
 }
+
+// ---------------------------------------------------------------- progressi
+
+// Mese mostrato nel calendario ('YYYY-MM'); null = il mese di oggi.
+let meseCalendario = null;
+
+const NOTE_TIPO = { studio: '', riposo: 'giorno di riposo', ripasso: 'ripasso', esame: 'giorno dell\'esame', fuori: '' };
+
+/** Frase che descrive un giorno, per il grafico e il calendario. */
+function descriviGiorno(data, pomodori, tipo, obiettivo = 0, opzioni) {
+  const parti = [plurale(pomodori, 'pomodoro', 'pomodori') + (obiettivo > 0 ? ` su ${obiettivo} di obiettivo` : '')];
+  if (NOTE_TIPO[tipo]) parti.push(NOTE_TIPO[tipo]);
+  return `${formattaData(data, opzioni)}: ${parti.join(' · ')}`;
+}
+
+function renderProgressi(esame, argomenti, sessioni, giorno) {
+  renderRiepilogoProgressi(esame, argomenti, sessioni, giorno);
+  renderGrafico(esame, argomenti, sessioni, giorno);
+  renderCalendario(esame, argomenti, sessioni, giorno);
+}
+
+function renderRiepilogoProgressi(esame, argomenti, sessioni, giorno) {
+  const percentuale = percentualeCompletata(argomenti, sessioni);
+  const totale = pesoTotale(argomenti);
+  const attuale = streak(sessioni, esame.giorniRiposo, giorno);
+  const migliore = streakMigliore(sessioni, esame.giorniRiposo, giorno);
+
+  $('#progressi-riepilogo').innerHTML = `
+    <p class="percentuale"><strong>${percentuale}%</strong><span>del programma completato</span></p>
+    <div class="barra-progresso" role="progressbar" aria-label="Programma completato"
+         aria-valuemin="0" aria-valuemax="100" aria-valuenow="${percentuale}">
+      <div style="width: ${percentuale}%"></div>
+    </div>
+    <p class="nota">${totale
+      ? `${pesoCompletato(argomenti, sessioni)} di ${plurale(totale, 'pomodoro', 'pomodori')} di programma.`
+      : 'Il programma è vuoto.'}</p>
+    <div class="statistiche">
+      <div><strong>${sessioni.length}</strong><span>${sessioni.length === 1 ? 'pomodoro fatto' : 'pomodori fatti'}</span></div>
+      <div><strong><span aria-hidden="true">🔥</span>${attuale}</strong><span>streak attuale</span></div>
+      <div><strong>${migliore}</strong><span>streak migliore</span></div>
+    </div>
+    <p class="nota">La streak conta i giorni di studio di fila con almeno un pomodoro; i giorni di riposo non la interrompono.</p>`;
+}
+
+function renderGrafico(esame, argomenti, sessioni, giorno) {
+  const giorni = storicoGiorni(esame, argomenti, sessioni, giorno, 14);
+  const scala = Math.max(1, ...giorni.map((g) => Math.max(g.pomodori, g.obiettivo ?? 0)));
+  const totale = giorni.reduce((somma, g) => somma + g.pomodori, 0);
+  const percento = (n) => `${(n / scala) * 100}%`;
+
+  const colonne = giorni.map((g) => {
+    const info = descriviGiorno(g.data, g.pomodori, g.tipo, g.obiettivo ?? 0);
+    return `
+      <button type="button" class="grafico-colonna" data-tipo="${g.tipo}" data-info="${esc(info)}"
+              aria-label="${esc(info)}" ${g.data === giorno ? 'aria-current="date"' : ''}>
+        <span class="grafico-area">
+          ${g.pomodori ? `<span class="grafico-barra" style="height: ${percento(g.pomodori)}"></span>` : ''}
+          ${g.obiettivo > 0 ? `<span class="grafico-obiettivo" style="bottom: ${percento(g.obiettivo)}"></span>` : ''}
+        </span>
+        <span class="grafico-giorno" aria-hidden="true">${esc(formattaData(g.data, { weekday: 'narrow' }))}<b>${Number(g.data.slice(8))}</b></span>
+      </button>`;
+  });
+
+  const oggiInfo = giorni.at(-1);
+  $('#progressi-grafico').innerHTML = `
+    <div class="intestazione">
+      <h2 id="titolo-grafico">Ultimi 14 giorni</h2>
+      <span class="nota">${plurale(totale, 'pomodoro', 'pomodori')}</span>
+    </div>
+    <div class="grafico-corpo">
+      <span class="grafico-scala" aria-hidden="true">${scala}</span>
+      <div class="grafico-colonne">${colonne.join('')}</div>
+    </div>
+    <div class="legenda" aria-hidden="true">
+      <span><i class="campione-barra"></i>Pomodori</span>
+      <span><i class="campione-obiettivo"></i>Obiettivo del giorno</span>
+    </div>
+    <p class="nota info-giorno" aria-live="polite">${esc(descriviGiorno(oggiInfo.data, oggiInfo.pomodori, oggiInfo.tipo, oggiInfo.obiettivo ?? 0))}</p>`;
+}
+
+function renderCalendario(esame, argomenti, sessioni, giorno) {
+  const meseOggi = giorno.slice(0, 7);
+  const mese = meseCalendario ?? meseOggi;
+  const perGiorno = pomodoriPerGiorno(sessioni);
+  const riferimento = tolleranzaInLinea(esame, argomenti);
+  const lungo = { weekday: 'long', day: 'numeric', month: 'long' };
+
+  const celle = grigliaMese(mese).map((d) => {
+    if (!d) return '<span class="cella vuota" aria-hidden="true"></span>';
+    const n = perGiorno.get(d) ?? 0;
+    const tipo = tipoGiorno(d, esame);
+    const info = descriviGiorno(d, n, tipo, 0, lungo);
+    return `
+      <button type="button" class="cella" data-tipo="${tipo}" data-livello="${livelloPomodori(n, riferimento)}"
+              ${d > giorno ? 'data-futuro' : ''} ${d === giorno ? 'aria-current="date"' : ''}
+              data-info="${esc(info)}" aria-label="${esc(info)}">${Number(d.slice(8))}</button>`;
+  });
+
+  const [anno, m] = mese.split('-').map(Number);
+  const nomeMese = new Date(anno, m - 1, 1).toLocaleDateString('it-IT', { month: 'long', year: 'numeric' });
+  const infoOggi = mese === meseOggi
+    ? descriviGiorno(giorno, perGiorno.get(giorno) ?? 0, tipoGiorno(giorno, esame), 0, lungo)
+    : 'Tocca un giorno per i dettagli.';
+
+  $('#progressi-calendario').innerHTML = `
+    <div class="calendario-testa">
+      <button type="button" class="secondario" data-mese="-1" aria-label="Mese precedente">‹</button>
+      <h2 id="titolo-calendario">${esc(nomeMese)}</h2>
+      <button type="button" class="secondario" data-mese="1" aria-label="Mese successivo">›</button>
+    </div>
+    ${mese !== meseOggi ? '<button type="button" class="testo piccolo torna-oggi" data-mese="0">Torna a oggi</button>' : ''}
+    <div class="calendario-griglia">
+      ${GIORNI.map((g) => `<span class="calendario-nome" aria-hidden="true">${g.nome[0]}</span>`).join('')}
+      ${celle.join('')}
+    </div>
+    <div class="legenda" aria-hidden="true">
+      <span class="legenda-livelli">Meno
+        ${[0, 1, 2, 3, 4].map((l) => `<i class="cella" data-livello="${l}"></i>`).join('')}
+        Più</span>
+      <span><i class="cella" data-tipo="riposo"></i>Riposo</span>
+      <span><i class="cella" data-tipo="ripasso"></i>Ripasso</span>
+      <span><i class="cella" data-tipo="esame"></i>Esame</span>
+    </div>
+    <p class="nota info-giorno" aria-live="polite">${esc(infoOggi)}</p>`;
+}
+
+// Toccare (o passare sopra) un giorno ne mostra i dettagli sotto il grafico o il calendario.
+for (const id of ['#progressi-grafico', '#progressi-calendario']) {
+  const sezione = $(id);
+  const mostraInfo = (e) => {
+    const info = e.target.closest('[data-info]')?.dataset.info;
+    if (info) sezione.querySelector('.info-giorno').textContent = info;
+  };
+  sezione.addEventListener('click', mostraInfo);
+  sezione.addEventListener('pointerover', mostraInfo);
+  sezione.addEventListener('focusin', mostraInfo);
+}
+
+$('#progressi-calendario').addEventListener('click', (e) => {
+  const passo = e.target.closest('[data-mese]')?.dataset.mese;
+  if (passo === undefined) return;
+  const meseOggi = oggi().slice(0, 7);
+  meseCalendario = passo === '0' ? null : aggiungiMesi(meseCalendario ?? meseOggi, Number(passo));
+  if (meseCalendario === meseOggi) meseCalendario = null;
+  render();
+  // Dopo il ridisegno il fuoco resta sulla stessa freccia.
+  $(`#progressi-calendario [data-mese="${passo === '0' ? '1' : passo}"]`)?.focus();
+});
 
 // ---------------------------------------------------------------- dialog
 
@@ -681,6 +864,8 @@ const NOMI_FASE = { pomodoro: 'Pomodoro', pausa_breve: 'Pausa breve', pausa_lung
 // Argomento scelto nel menu del timer; se diventa fatto si torna al primo non fatto.
 let argomentoScelto = null;
 let ticker = null;
+// Pomodori del giorno in cui l'ultimo pomodoro ha raggiunto l'obiettivo: lo dice la domanda "finito?".
+let obiettivoRaggiunto = null;
 
 // Nel menu solo gli argomenti da finire; a programma completato tutti, per ripassare.
 function argomentiSceglibili(argomenti) {
@@ -707,10 +892,21 @@ function aggiornaStatoTimer() {
   });
   if (!eventi.length) return;
   for (const e of eventi) {
-    if (e.tipo === 'pomodoro_finito') storage.aggiungiSessione(e.sessione);
+    if (e.tipo === 'pomodoro_finito') registraPomodoro(e.sessione);
   }
   storage.salvaTimer(stato);
   avvisa(eventi.at(-1), stato);
+}
+
+/** Registra la sessione e si segna se con questo pomodoro l'obiettivo del giorno è raggiunto. */
+function registraPomodoro(sessione) {
+  const sessioni = storage.getSessioni();
+  if (sessioni.some((s) => s.id === sessione.id)) return; // già registrato da un'altra scheda
+  const esame = esameCorrente();
+  if (esame && raggiungeObiettivo(esame, storage.getArgomenti(esame.id), sessioni, sessione)) {
+    obiettivoRaggiunto = pomodoriDelGiorno(sessioni, sessione.data) + 1;
+  }
+  storage.aggiungiSessione(sessione);
 }
 
 function isScadutoOra({ attivo }) {
@@ -866,8 +1062,12 @@ function renderEsito(argomenti) {
   if (!argomento) {
     // Argomento eliminato nel frattempo: non c'è niente da chiedere.
     storage.salvaTimer({ ...storage.getTimer(), daConfermare: null });
+    obiettivoRaggiunto = null;
     return;
   }
+  const messaggio = $('#obiettivo-esito');
+  messaggio.hidden = !obiettivoRaggiunto;
+  if (obiettivoRaggiunto) messaggio.textContent = `🎯 Obiettivo di oggi raggiunto: ${plurale(obiettivoRaggiunto, 'pomodoro', 'pomodori')}!`;
   $('#testo-esito').innerHTML = `Hai finito <strong>${esc(argomento.titolo)}</strong> o resta in corso?`;
   dlgEsito.returnValue = '';
   dlgEsito.showModal();
@@ -884,6 +1084,7 @@ dlgEsito.addEventListener('close', () => {
     storage.salvaArgomento(conStato(argomento, nuovo, oggi()));
   }
   storage.salvaTimer({ ...stato, daConfermare: null });
+  obiettivoRaggiunto = null;
   render();
 });
 
@@ -1005,7 +1206,9 @@ function testoNotifiche() {
 function avvisa(evento, stato) {
   if (evento.tipo === 'pomodoro_finito') {
     suona([660, 880, 1100]);
-    notifica('Pomodoro completato 🍅', `Ora ${NOMI_FASE[stato.attivo?.fase ?? 'pausa_breve'].toLowerCase()}.`);
+    notifica(
+      obiettivoRaggiunto ? 'Obiettivo di oggi raggiunto 🎯' : 'Pomodoro completato 🍅',
+      `Ora ${NOMI_FASE[stato.attivo?.fase ?? 'pausa_breve'].toLowerCase()}.`);
   } else {
     suona([880, 660]);
     notifica('Pausa finita', 'Quando vuoi, avvia il prossimo pomodoro.');

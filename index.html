@@ -66,6 +66,13 @@
         <button type="submit" class="primario" aria-label="Aggiungi compito">+</button>
       </form>
     </section>
+
+    <!-- Progressi -->
+    <section id="progressi-riepilogo" class="card progressi-riepilogo" hidden data-vista="progressi" aria-label="Riepilogo dei progressi"></section>
+
+    <section id="progressi-grafico" class="card grafico" hidden data-vista="progressi" aria-labelledby="titolo-grafico"></section>
+
+    <section id="progressi-calendario" class="card calendario" hidden data-vista="progressi" aria-labelledby="titolo-calendario"></section>
   </main>
 
   <nav class="navigazione" aria-label="Schermate">
@@ -76,6 +83,10 @@
     <a href="#programma" data-vai="programma">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2"/><circle cx="4.5" cy="12" r="1.2"/><circle cx="4.5" cy="18" r="1.2"/></svg>
       <span>Programma</span>
+    </a>
+    <a href="#progressi" data-vai="progressi">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h16"/><path d="M7 16v-4M12 16V7M17 16v-6"/></svg>
+      <span>Progressi</span>
     </a>
   </nav>
 
@@ -150,6 +161,7 @@
   <dialog id="dlg-esito">
     <form method="dialog">
       <h2>Pomodoro completato 🍅</h2>
+      <p id="obiettivo-esito" class="obiettivo-esito" hidden></p>
       <p id="testo-esito"></p>
       <div class="azioni">
         <span class="spazio"></span>
