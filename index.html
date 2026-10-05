@@ -20,6 +20,8 @@
       <h2>Inizia dal tuo esame</h2>
       <p>Imposta la data dell'esame e i giorni di riposo: il ritmo di studio si calcola da solo.</p>
       <button type="button" class="primario" data-apri="esame">Crea esame</button>
+      <!-- Su un nuovo dispositivo: le Impostazioni altrimenti si aprono solo dal timer. -->
+      <button type="button" class="testo" data-apri="impostazioni">Hai un file di dati? Importalo</button>
     </section>
 
     <!-- Oggi -->
@@ -171,10 +173,10 @@
     </form>
   </dialog>
 
-  <!-- Impostazioni del timer -->
+  <!-- Impostazioni: timer, pomodori di prova, esporta/importa dati -->
   <dialog id="dlg-impostazioni">
     <form id="form-impostazioni" novalidate>
-      <h2>Impostazioni timer</h2>
+      <h2>Impostazioni</h2>
       <div class="due-colonne">
         <label class="campo">Pomodoro (min)
           <input name="durataPomodoro" type="number" inputmode="numeric" min="1" max="120" required>
@@ -207,6 +209,17 @@
           <button type="button" id="cancella-sessioni" class="secondario pericolo">Cancella</button>
         </div>
         <p id="anteprima-cancella" class="nota" aria-live="polite"></p>
+      </fieldset>
+
+      <!-- Anche questo agisce subito: l'importazione chiede conferma prima di sovrascrivere. -->
+      <fieldset class="cancella-giorno">
+        <legend>Dati</legend>
+        <div class="aggiunta">
+          <button type="button" id="esporta-dati" class="secondario">Esporta dati</button>
+          <button type="button" id="importa-dati" class="secondario">Importa dati</button>
+          <input id="file-importa" type="file" accept=".json,application/json" hidden>
+        </div>
+        <p id="stato-dati" class="nota" aria-live="polite">Un file con esami, argomenti, pomodori, compiti e impostazioni.</p>
       </fieldset>
     </form>
   </dialog>

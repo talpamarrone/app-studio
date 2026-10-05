@@ -612,6 +612,7 @@ document.addEventListener('click', (e) => {
   if (!bottone) return;
   if (bottone.dataset.apri === 'esame') apriEsame();
   if (bottone.dataset.apri === 'elenco') apriElenco();
+  if (bottone.dataset.apri === 'impostazioni') apriImpostazioni();
 });
 
 // ---------------------------------------------------------------- esame
@@ -1109,6 +1110,7 @@ function apriImpostazioni() {
   $('#stato-notifiche').textContent = testoNotifiche();
   $('#data-cancella').value = oggi();
   aggiornaAnteprimaCancella();
+  $('#stato-dati').textContent = NOTA_DATI;
   apriDialog($('#dlg-impostazioni'));
 }
 
@@ -1140,7 +1142,57 @@ $('#cancella-sessioni').addEventListener('click', () => {
   aggiornaAnteprimaCancella(`${tolte === 1 ? 'Cancellato 1 pomodoro' : `Cancellati ${tolte} pomodori`}.`);
 });
 
-$('#ripristina-impostazioni').addEventListener('click', () => riempiImpostazioni(storage.IMPOSTAZIONI_DEFAULT));
+// ---------------------------------------------------------------- esporta / importa dati
+
+const NOTA_DATI = 'Un file con esami, argomenti, pomodori, compiti e impostazioni.';
+
+$('#esporta-dati').addEventListener('click', () => {
+  const testo = JSON.stringify(storage.esportaDati(), null, 2);
+  const url = URL.createObjectURL(new Blob([testo], { type: 'application/json' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `app-studio-${oggi()}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  $('#stato-dati').textContent = `File ${link.download} scaricato.`;
+});
+
+$('#importa-dati').addEventListener('click', () => $('#file-importa').click());
+
+$('#file-importa').addEventListener('change', async (ev) => {
+  const file = ev.target.files[0];
+  ev.target.value = ''; // così si può scegliere di nuovo lo stesso file
+  if (!file) return;
+  let backup;
+  try {
+    backup = storage.leggiBackup(await file.text());
+  } catch (errore) {
+    $('#stato-dati').textContent = errore.message;
+    return;
+  }
+  const contenuto = [
+    plurale(backup.esami.length, 'esame', 'esami'),
+    plurale(backup.argomenti.length, 'argomento', 'argomenti'),
+    plurale(backup.sessioni.length, 'pomodoro', 'pomodori'),
+    plurale(backup.compiti.length, 'compito', 'compiti'),
+  ].join(', ');
+  const timerInCorso = storage.getTimer().attivo ? ' Il timer in corso si ferma.' : '';
+  if (!confirm(`Il file contiene ${contenuto}. Sostituire tutti i dati attuali con questi? Non si può annullare.${timerInCorso}`)) {
+    $('#stato-dati').textContent = NOTA_DATI;
+    return;
+  }
+  storage.importaDati(backup);
+  argomentoScelto = null;
+  obiettivoRaggiunto = null;
+  riempiImpostazioni(storage.getImpostazioni());
+  aggiornaAnteprimaCancella();
+  render();
+  $('#stato-dati').textContent = `Dati importati: ${contenuto}.`;
+});
+
+$('#ripristina-impostazioni').addEventListener('click',() => riempiImpostazioni(storage.IMPOSTAZIONI_DEFAULT));
 
 formImpostazioni.addEventListener('submit', (ev) => {
   ev.preventDefault();

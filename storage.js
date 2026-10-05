@@ -224,6 +224,113 @@ export function salvaImpostazioni(impostazioni) {
   scrivi();
 }
 
+// ---------------------------------------------------------------- esporta / importa
+
+const FORMATO_BACKUP = 'app-studio';
+const VERSIONE_BACKUP = 1;
+const STATI_ARGOMENTO = ['da_fare', 'in_corso', 'fatto'];
+
+/**
+ * Tutti i dati da salvare in un file: esami, argomenti, sessioni, compiti e impostazioni.
+ * Il timer in corso resta fuori: riguarda solo questo dispositivo, adesso.
+ */
+export function esportaDati(adesso = new Date()) {
+  const d = leggi();
+  return {
+    formato: FORMATO_BACKUP,
+    versione: VERSIONE_BACKUP,
+    esportatoIl: adesso.toISOString(),
+    esami: copia(d.esami),
+    argomenti: copia(d.argomenti),
+    sessioni: copia(d.sessioni),
+    compiti: copia(d.compiti),
+    impostazioni: getImpostazioni(),
+  };
+}
+
+const isData = (x) => typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x);
+const isTesto = (x) => typeof x === 'string';
+const isNumero = (x) => typeof x === 'number' && Number.isFinite(x);
+const isIntero = (x, min) => Number.isInteger(x) && x >= min;
+
+// Per ogni raccolta: messaggio di errore e controllo di un elemento (true se valido).
+const CONTROLLI = {
+  esami: ['un esame non valido', (e) =>
+    isTesto(e.nome) && isData(e.dataEsame) && (e.dataInizio == null || isData(e.dataInizio))
+    && Array.isArray(e.giorniRiposo) && e.giorniRiposo.every((g) => Number.isInteger(g) && g >= 0 && g <= 6)
+    && isIntero(e.giorniRipasso ?? 0, 0)],
+  argomenti: ['un argomento non valido', (a) =>
+    isTesto(a.esameId) && isTesto(a.titolo) && isNumero(a.peso) && a.peso >= 0
+    && STATI_ARGOMENTO.includes(a.stato) && isNumero(a.ordine)
+    && (a.dataCompletamento == null || isData(a.dataCompletamento))],
+  sessioni: ['una sessione non valida', (s) => isTesto(s.argomentoId) && isData(s.data) && isNumero(s.durataMinuti)],
+  compiti: ['un compito non valido', (c) => isTesto(c.testo) && typeof c.fatto === 'boolean'],
+};
+
+/**
+ * Legge il testo di un file esportato e lo controlla. Restituisce i dati pronti per
+ * `importaDati`; se il file non va bene lancia un Error con un messaggio da mostrare.
+ */
+export function leggiBackup(testo) {
+  let b;
+  try {
+    b = JSON.parse(testo);
+  } catch {
+    throw new Error('Il file non è un file di dati dell\'app (non è JSON valido).');
+  }
+  if (!b || typeof b !== 'object' || b.formato !== FORMATO_BACKUP) {
+    throw new Error('Il file non è un file di dati dell\'app.');
+  }
+  if (!Number.isInteger(b.versione) || b.versione > VERSIONE_BACKUP) {
+    throw new Error('Il file viene da una versione più recente dell\'app.');
+  }
+  for (const [chiave, [nome, valido]] of Object.entries(CONTROLLI)) {
+    const lista = b[chiave];
+    if (!Array.isArray(lista)) throw new Error(`Nel file mancano i dati: ${chiave}.`);
+    const ids = new Set();
+    for (const x of lista) {
+      if (!x || typeof x !== 'object' || !isTesto(x.id) || !x.id || !valido(x)) {
+        throw new Error(`Il file contiene ${nome}.`);
+      }
+      if (ids.has(x.id)) throw new Error(`Il file contiene due ${chiave} con lo stesso id.`);
+      ids.add(x.id);
+    }
+  }
+  const esamiIds = new Set(b.esami.map((e) => e.id));
+  if (b.argomenti.some((a) => !esamiIds.has(a.esameId))) {
+    throw new Error('Il file contiene un argomento di un esame che non c\'è.');
+  }
+  const impostazioni = { ...IMPOSTAZIONI_DEFAULT };
+  if (b.impostazioni != null) {
+    if (typeof b.impostazioni !== 'object') throw new Error('Il file contiene impostazioni non valide.');
+    for (const campo of Object.keys(IMPOSTAZIONI_DEFAULT)) {
+      const v = b.impostazioni[campo];
+      if (v === undefined) continue;
+      if (!isIntero(v, 1)) throw new Error('Il file contiene impostazioni non valide.');
+      impostazioni[campo] = v;
+    }
+  }
+  return {
+    esami: copia(b.esami),
+    argomenti: copia(b.argomenti),
+    sessioni: copia(b.sessioni),
+    compiti: copia(b.compiti),
+    impostazioni,
+  };
+}
+
+/**
+ * Sostituisce tutti i dati con quelli di `leggiBackup`. Il timer riparte vuoto.
+ * I dati di prima si mettono da parte nel backend (solo l'ultima copia, per non
+ * riempire lo spazio a ogni importazione), per non perderli del tutto.
+ */
+export function importaDati(backup) {
+  const grezzo = backend.getItem(CHIAVE);
+  if (grezzo) backend.setItem(`${CHIAVE}:prima-di-importare`, grezzo);
+  dati = { ...datiVuoti(), ...copia(backup) };
+  scrivi();
+}
+
 // ---------------------------------------------------------------- timer
 
 /** Stato del timer: { attivo, daConfermare } (vedi logic.js). */

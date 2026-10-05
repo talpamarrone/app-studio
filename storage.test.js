@@ -187,3 +187,136 @@ describe('robustezza', () => {
     }
   });
 });
+
+describe('esporta e importa', () => {
+  function riempi() {
+    const esame = storage.salvaEsame(esameBase);
+    const [a1] = storage.aggiungiArgomenti(esame.id, [{ titolo: 'Limiti', peso: 3 }, { titolo: 'Derivate', peso: 2 }]);
+    storage.aggiungiSessione({ argomentoId: a1.id, data: '2026-10-05', durataMinuti: 25 });
+    storage.aggiungiCompito('Comprare il libro');
+    storage.salvaImpostazioni({ durataPomodoro: 30 });
+    storage.salvaTimer({ attivo: { fase: 'pomodoro' }, daConfermare: null });
+    return esame;
+  }
+
+  test('esporta tutto tranne il timer', () => {
+    riempi();
+    const b = storage.esportaDati(new Date('2026-10-05T10:00:00Z'));
+    assert.equal(b.formato, 'app-studio');
+    assert.equal(b.versione, 1);
+    assert.equal(b.esportatoIl, '2026-10-05T10:00:00.000Z');
+    assert.equal(b.esami.length, 1);
+    assert.equal(b.argomenti.length, 2);
+    assert.equal(b.sessioni.length, 1);
+    assert.equal(b.compiti.length, 1);
+    assert.equal(b.impostazioni.durataPomodoro, 30);
+    assert.equal(b.impostazioni.pausaBreve, 5);
+    assert.equal('timer' in b, false);
+  });
+
+  test('andata e ritorno: esporta, svuota, importa', () => {
+    riempi();
+    const testo = JSON.stringify(storage.esportaDati());
+    storage.usaBackend(backendFinto());
+    storage.importaDati(storage.leggiBackup(testo));
+    const b = storage.esportaDati();
+    const originale = JSON.parse(testo);
+    for (const k of ['esami', 'argomenti', 'sessioni', 'compiti', 'impostazioni']) {
+      assert.deepEqual(b[k], originale[k]);
+    }
+  });
+
+  test('importa sovrascrive, svuota il timer e mette da parte i dati di prima', () => {
+    riempi();
+    const vuoto = storage.leggiBackup(JSON.stringify({
+      formato: 'app-studio', versione: 1, esami: [], argomenti: [], sessioni: [], compiti: [],
+    }));
+    storage.importaDati(vuoto);
+    assert.deepEqual(storage.getEsami(), []);
+    assert.deepEqual(storage.getSessioni(), []);
+    assert.deepEqual(storage.getCompiti(), []);
+    assert.deepEqual(storage.getImpostazioni(), storage.IMPOSTAZIONI_DEFAULT);
+    assert.deepEqual(storage.getTimer(), { attivo: null, daConfermare: null });
+    const prima = JSON.parse(backend.getItem('app-studio:v1:prima-di-importare'));
+    assert.equal(prima.esami.length, 1);
+    // Sopravvive a un ricaricamento.
+    storage.ricarica();
+    assert.deepEqual(storage.getEsami(), []);
+  });
+
+  test('il backup restituito non è legato al testo letto', () => {
+    riempi();
+    const backup = storage.leggiBackup(JSON.stringify(storage.esportaDati()));
+    storage.importaDati(backup);
+    backup.esami[0].nome = 'Modificato';
+    assert.equal(storage.getEsami()[0].nome, 'Analisi 1');
+  });
+
+  describe('file non validi', () => {
+    function backupValido() {
+      riempi();
+      return storage.esportaDati();
+    }
+    const rifiuta = (b, messaggio) =>
+      assert.throws(() => storage.leggiBackup(typeof b === 'string' ? b : JSON.stringify(b)), messaggio);
+
+    test('non JSON', () => rifiuta('{rotto', /JSON/));
+    test('JSON di altro tipo', () => {
+      rifiuta('null', /non è un file di dati/);
+      rifiuta('[1,2]', /non è un file di dati/);
+      rifiuta({ esami: [] }, /non è un file di dati/);
+    });
+    test('versione più recente', () => rifiuta({ ...backupValido(), versione: 2 }, /più recente/));
+    test('raccolta mancante', () => {
+      const b = backupValido();
+      delete b.sessioni;
+      rifiuta(b, /sessioni/);
+    });
+    test('esame senza data', () => {
+      const b = backupValido();
+      b.esami[0].dataEsame = '19/10/2026';
+      rifiuta(b, /esame non valido/);
+    });
+    test('argomento con stato sconosciuto', () => {
+      const b = backupValido();
+      b.argomenti[0].stato = 'boh';
+      rifiuta(b, /argomento non valido/);
+    });
+    test('argomento di un esame che non c\'è', () => {
+      const b = backupValido();
+      b.argomenti[0].esameId = 'altro';
+      rifiuta(b, /esame che non c'è/);
+    });
+    test('sessione senza id', () => {
+      const b = backupValido();
+      delete b.sessioni[0].id;
+      rifiuta(b, /una sessione non valida/);
+    });
+    test('compito con fatto non booleano', () => {
+      const b = backupValido();
+      b.compiti[0].fatto = 'no';
+      rifiuta(b, /compito non valido/);
+    });
+    test('id duplicati', () => {
+      const b = backupValido();
+      b.argomenti[1].id = b.argomenti[0].id;
+      rifiuta(b, /stesso id/);
+    });
+    test('impostazioni non valide', () => {
+      const b = backupValido();
+      b.impostazioni.pausaBreve = 0;
+      rifiuta(b, /impostazioni/);
+    });
+    test('un file rifiutato non tocca i dati', () => {
+      const b = backupValido();
+      b.compiti[0].fatto = 'no';
+      rifiuta(b, /compito/);
+      assert.equal(storage.getEsami().length, 1);
+    });
+  });
+
+  test('impostazioni mancanti: valori predefiniti', () => {
+    const b = { formato: 'app-studio', versione: 1, esami: [], argomenti: [], sessioni: [], compiti: [] };
+    assert.deepEqual(storage.leggiBackup(JSON.stringify(b)).impostazioni, storage.IMPOSTAZIONI_DEFAULT);
+  });
+});

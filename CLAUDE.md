@@ -62,6 +62,8 @@ Il modello supporta più esami fin da subito, anche se l'interfaccia iniziale ne
 - Obiettivo raggiunto: il messaggio compare nella domanda "finito?" (e nella notifica) solo per il pomodoro che porta i pomodori del giorno esattamente all'obiettivo; non si salva.
 - Totale pomodori fatti = tutte le sessioni, anche di argomenti eliminati.
 - Impostazioni: si possono cancellare tutte le sessioni di un giorno (con conferma), per togliere i pomodori di prova. Agisce subito, senza Salva, e non cambia lo stato degli argomenti.
+- Esporta/importa: un file JSON (`formato: 'app-studio'`, `versione`) con esami, argomenti, sessioni, compiti e impostazioni; il timer in corso resta fuori. L'importazione controlla il file (`leggiBackup`), chiede conferma e sostituisce tutto; il timer riparte vuoto e i dati di prima restano nello storage sotto `app-studio:v1:prima-di-importare` (solo l'ultima copia).
+- Impostazioni si aprono anche dalla schermata di benvenuto ("Hai un file di dati? Importalo"), per importare su un nuovo dispositivo.
 - Oggi: la frase sotto l'obiettivo usa il peso rimanente a inizio giornata (quello dell'obiettivo); se oggi hai già studiato lo dice ("a inizio giornata restavano…").
 
 ## Schermate
